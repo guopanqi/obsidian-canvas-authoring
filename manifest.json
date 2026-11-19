@@ -1,1 +1,1 @@
-{"id":"canvas-authoring","name":"Canvas Authoring","version":"0.2.0","minAppVersion":"1.13.0","description":"Canvas 节点创作、复制与 Claude Canvas 可选主题。","author":"SSNoir","isDesktopOnly":false}
+{"id":"canvas-authoring","name":"Canvas Authoring","version":"0.2.1","minAppVersion":"1.13.0","description":"Author and style Obsidian Canvas nodes, with an optional Claude-inspired theme.","author":"SSNoir","isDesktopOnly":false}

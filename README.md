@@ -1,5 +1,26 @@
 # Canvas Authoring
 
+Canvas Authoring adds node creation, layout, duplication, clipboard, and styling tools to Obsidian Canvas. It does not require Advanced Canvas. An optional Claude-inspired visual theme is included and disabled by default.
+
+## Installation
+
+1. Open **Settings → Community plugins → Browse** in Obsidian.
+2. Search for **Canvas Authoring** and select **Install**.
+3. Enable **Canvas Authoring** in **Settings → Community plugins**.
+
+For a manual or development install, create `.obsidian/plugins/canvas-authoring/` in your vault and copy `main.js`, `manifest.json`, and `styles.css` from a GitHub release into that folder. Then enable the plugin in Obsidian.
+
+## Usage
+
+- Select a text or file node and press **Tab** to add a child node.
+- Select a node with a single arrowless incoming edge and press **Enter** to add a sibling.
+- Use the command palette or a node context menu to add a follow-up node, annotation, or duplicate.
+- Use the green handles around a selected node to add and connect a child.
+- Open **Settings → Community plugins → Canvas Authoring** and enable **Claude Canvas Theme** to use the optional appearance. It is off by default.
+- Use the context menus and command palette for node links, group import/export, clipboard actions, text color, and font scale.
+
+Canvas Authoring relies on Obsidian's internal Canvas runtime APIs, which may change between Obsidian releases. Back up your vault before major Obsidian upgrades and review Canvas behavior after updating.
+
 独立的 Obsidian Canvas 扩展，不依赖 Advanced Canvas。Claude Canvas 外观主题已集成在插件内，可在插件设置中单独开启或关闭，默认关闭。
 
 在 Obsidian 社区插件市场安装 Canvas Authoring 并启用。开发版安装时将 `dist/` 中的 `main.js`、`manifest.json` 和 `styles.css` 放入 Vault 的 `.obsidian/plugins/canvas-authoring/`，然后在第三方插件设置中启用。更新后重新加载插件。
