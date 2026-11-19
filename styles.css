@@ -1,0 +1,238 @@
+.canvas-authoring-controls { position: absolute; inset: 0; pointer-events: none; z-index: 20; }
+.canvas-authoring-add.canvas-authoring-add {
+  position: absolute; width: 24px; height: 24px; min-width: 0; padding: 0;
+  border-radius: 50%; border: 2px solid var(--background-primary);
+  background: #36835b; color: white; font: 20px/20px sans-serif;
+  pointer-events: auto; cursor: pointer !important; touch-action: none; box-shadow: 0 1px 4px #0004;
+}
+.canvas-authoring-add:hover { background: #246844; }
+.canvas-authoring-add:focus-visible { outline: 2px solid var(--text-normal); outline-offset: 2px; }
+/* Offset along the edge so native midpoint connection handles stay accessible. */
+.canvas-authoring-top { top: -34px; left: 70%; }
+.canvas-authoring-bottom { bottom: -34px; left: 70%; }
+.canvas-authoring-left { left: -34px; top: 70%; }
+.canvas-authoring-right { right: -34px; top: 70%; }
+.canvas-node.is-editing .canvas-authoring-controls { display: none; }
+/* Edge captions share card body typography; do not enlarge them at low zoom. */
+.canvas-wrapper .canvas-path-label {
+  background: transparent;
+  font-family: var(--font-text);
+  font-size: var(--font-text-size);
+  line-height: var(--line-height-normal);
+  padding: 2px 4px;
+}
+
+/* Independent card surface and text colors. */
+.canvas-node.canvas-authoring-transparent .canvas-node-container,
+.canvas-node.canvas-authoring-transparent .canvas-node-content {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+.canvas-node.canvas-authoring-font-color .canvas-node-content {
+  --text-normal: var(--authoring-font-color);
+  --text-muted: var(--authoring-font-color);
+  --text-faint: var(--authoring-font-color);
+  --h1-color: var(--authoring-font-color);
+  --h2-color: var(--authoring-font-color);
+  --h3-color: var(--authoring-font-color);
+  color: var(--authoring-font-color);
+}
+.canvas-node.canvas-authoring-font-color .markdown-rendered,
+.canvas-node.canvas-authoring-font-color .cm-content { color: var(--authoring-font-color); }
+/* A transparent surface still needs the native selection/focus affordance.
+   Override only the outer frame; the text surface remains transparent. */
+.canvas-node.canvas-authoring-transparent.is-selected .canvas-node-container,
+.canvas-node.canvas-authoring-transparent.is-focused .canvas-node-container {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 1px var(--color-accent) !important;
+}
+.canvas-authoring-transparent-choice {
+  background: repeating-conic-gradient(var(--background-modifier-border) 0% 25%, transparent 0% 50%) 50% / 8px 8px;
+}
+.canvas-color-picker-item.canvas-authoring-transparent-choice {
+  --canvas-color: var(--text-muted);
+  border: 1px solid var(--background-modifier-border);
+}
+
+/* Unscaled, temporary source-text layout used only when pasting a new card. */
+.canvas-authoring-text-measure {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  contain: layout style paint;
+  box-sizing: border-box;
+  height: auto;
+  padding: 12px 20px;
+  font-family: var(--font-text);
+  font-size: var(--font-text-size);
+  line-height: var(--line-height-normal);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 4;
+}
+
+/* A visual hint only: empty transparent cards keep empty Markdown data. */
+.canvas-authoring-empty-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  color: #999994;
+  font-family: var(--font-text);
+  font-size: var(--font-text-size);
+  line-height: var(--line-height-normal);
+  pointer-events: none;
+  user-select: none;
+  overflow: hidden;
+}
+.canvas-node.is-editing .canvas-authoring-empty-placeholder {
+  display: none;
+}
+
+/* Preview sets its own font-size; inherit the node's explicit scaled text size. */
+.canvas-node.canvas-authoring-scaled-text .markdown-preview-view,
+.canvas-node.canvas-authoring-scaled-text .markdown-rendered {
+  --font-text-size: var(--authoring-font-size);
+  font-size: var(--authoring-font-size) !important;
+}
+.canvas-menu .canvas-authoring-font-scale {
+  min-width: 0;
+  padding: var(--size-4-2);
+  border: none;
+  border-radius: var(--radius-s);
+  background: transparent;
+  box-shadow: none;
+  color: var(--icon-color);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1;
+}
+.canvas-menu .canvas-authoring-font-scale:hover {
+  background: var(--background-modifier-hover);
+  color: var(--icon-color-hover);
+}
+
+/* Optional bundled Claude Canvas theme, enabled by plugin setting. */
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] {
+  color-scheme: light;
+  --canvas-background: #fafaf9;
+  --canvas-dot-pattern: transparent;
+  --background-primary: #ffffff;
+  --background-secondary: #f4f4f2;
+  --background-modifier-border: #d3d2ce;
+  --background-modifier-hover: #eeeeec;
+  --interactive-normal: #ffffff;
+  --interactive-hover: #f1f1ef;
+  --text-normal: #292823;
+  --text-muted: #75736d;
+  --text-faint: #96938c;
+  --color-accent: #2784ef;
+  --canvas-color: #8b8579;
+  /* Ink colors stay distinct from pastel card surfaces. */
+  --canvas-color-1: #bd292b;
+  --canvas-color-2: #a65c08;
+  --canvas-color-3: #6d5c22;
+  --canvas-color-4: #317b38;
+  --canvas-color-5: #407c74;
+  --canvas-color-6: #7064a4;
+}
+/* Reset each node so a group cannot pass its surface color to child cards. */
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node,
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-color-picker-item { --claude-note-surface: #ffffff; }
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .mod-canvas-color-1 { --claude-note-surface: #f5cbc7; }
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .mod-canvas-color-2 { --claude-note-surface: #f8daba; }
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .mod-canvas-color-3 { --claude-note-surface: #fff5a5; }
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .mod-canvas-color-4 { --claude-note-surface: #cfe4c7; }
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .mod-canvas-color-5 { --claude-note-surface: #c4e3df; }
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .mod-canvas-color-6 { --claude-note-surface: #d9ceee; }
+/* The background picker previews paper colors; font-color choices keep dark ink. */
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-color-picker-item:not(.canvas-authoring-transparent-choice) {
+  background-color: var(--claude-note-surface);
+  border: 1px solid color-mix(in srgb, var(--canvas-color) 30%, transparent);
+}
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-color-picker-custom {
+  --claude-note-surface: color-mix(in srgb, var(--canvas-color) 28%, white);
+}
+/* Custom node colors also get a paper-like surface, without changing saved data. */
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node.is-themed:not([class*='mod-canvas-color-']) {
+  --claude-note-surface: color-mix(in srgb, var(--canvas-color) 28%, white);
+}
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node:not(.is-dummy):not(.canvas-authoring-transparent) .canvas-node-container {
+  border: 1px solid #cfcdc4;
+  border-radius: 4px;
+  background: var(--claude-note-surface);
+  box-shadow: 0 2px 3px #302b2010, 0 10px 24px #302b2012;
+}
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node .canvas-node-content {
+  background: transparent;
+}
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node .markdown-rendered,
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node .markdown-source-view {
+  --h1-color: var(--text-normal);
+  --h2-color: var(--text-normal);
+  --h3-color: var(--text-normal);
+  --code-background: #00000008;
+  --table-border-color: #00000020;
+  --link-color: #326eaa;
+  --link-color-hover: #22558a;
+}
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-group-label {
+  background: transparent !important;
+  color: #6b6861 !important;
+  font-size: 1em;
+  font-weight: 400;
+}
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node.is-selected .canvas-node-container,
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node.is-focused .canvas-node-container {
+  border-color: #2784ef;
+  box-shadow: 0 0 0 1px #2784ef, 0 8px 22px #302b2010;
+}
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-edges .canvas-display-path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-edges g.is-focused { --canvas-color: #2784ef; }
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-menu,
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-card-menu,
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-control-group {
+  background: #ffffff;
+  border: 1px solid #d0cfcb;
+  border-radius: 14px;
+  box-shadow: 0 2px 5px #0000000a, 0 10px 30px #00000014;
+  color: #292823;
+}
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-card-menu .canvas-card-menu-button svg { fill: #ffffff; }
+
+/* Editing uses the same paper as preview, rather than the editor's white surface. */
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node {
+  --background-primary: var(--claude-note-surface);
+  --background-primary-alt: var(--claude-note-surface);
+}
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node.canvas-authoring-transparent {
+  --background-primary: transparent;
+  --background-primary-alt: transparent;
+}
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node .markdown-source-view,
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node .cm-editor,
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node .cm-scroller,
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node .cm-gutters {
+  background-color: transparent;
+}
+/* Show the colored card while its isolated editor receives its surface style. */
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-node.canvas-authoring-editor-surface iframe.embed-iframe.is-controlled:not(.canvas-authoring-surface-ready) {
+  visibility: hidden;
+}
+
+/* Edge captions stay readable on the light canvas, independently of edge color. */
+body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] .canvas-path-label {
+  color: #393830;
+  --text-normal: #393830;
+  text-shadow: -1px -1px 0 var(--canvas-background),
+    1px -1px 0 var(--canvas-background),
+    -1px 1px 0 var(--canvas-background),
+    1px 1px 0 var(--canvas-background);
+}
