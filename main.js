@@ -1,6 +1,6 @@
 const { Plugin, Notice, Menu, Setting, PluginSettingTab, setIcon, MarkdownRenderer, htmlToMarkdown } = require('obsidian');
 
-const DEFAULT_SETTINGS = { claudeCanvasTheme: false };
+const DEFAULT_SETTINGS = { claudeCanvasTheme: true };
 
 // Canvas's runtime API is internal; keep access to it in this small adapter.
 module.exports = class CanvasAuthoring extends Plugin {
