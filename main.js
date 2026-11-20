@@ -1,4 +1,4 @@
-const { Plugin, Notice, Menu, Setting, PluginSettingTab, setIcon, MarkdownRenderer, htmlToMarkdown } = require('obsidian');
+const { Plugin, Notice, Menu, Setting, PluginSettingTab, setIcon, setTooltip, MarkdownRenderer, htmlToMarkdown } = require('obsidian');
 
 const DEFAULT_SETTINGS = { claudeCanvasTheme: true };
 
@@ -17,7 +17,7 @@ module.exports = class CanvasAuthoring extends Plugin {
     this.menuObservers = new Map();
     this.fontBreakpoints = new Map();
     this.editorFrames = new WeakSet();
-    this.addCommand({id: 'copy-node-link', name: '复制跳转链接', checkCallback: checking => {
+    this.addCommand({id: 'copy-node-link', name: 'Copy node link', checkCallback: checking => {
       const canvas = this.canvas();
       const node = canvas?.selection.size === 1 ? [...canvas.selection][0] : null;
       if (!node || !canvas.nodes.has(node.id)) return false;
@@ -36,13 +36,13 @@ module.exports = class CanvasAuthoring extends Plugin {
       });
       this.jumpToNode(href, source || '');
     }, true);
-    this.addCommand({id: 'copy-content', name: '复制', checkCallback: checking => {
+    this.addCommand({id: 'copy-content', name: 'Copy', checkCallback: checking => {
       const canvas = this.canvas();
       if (!this.canCopyContent(canvas)) return false;
       if (!checking) this.copyContent(canvas);
       return true;
     }});
-    this.addCommand({id: 'copy-selection', name: '复制节点数据', checkCallback: checking => {
+    this.addCommand({id: 'copy-selection', name: 'Copy node data', checkCallback: checking => {
       const canvas = this.canvas();
       if (!this.canCopy(canvas)) return false;
       if (!checking) this.copySelection(canvas);
@@ -86,21 +86,21 @@ module.exports = class CanvasAuthoring extends Plugin {
         }), false);
         canvas.deselectAll(); for (const node of added) canvas.select(node);
         canvas.requestSave(); this.attach();
-      } catch (error) { console.error('Canvas Authoring: node paste failed', error); new Notice(`粘贴节点失败：${error.message}`); }
+      } catch (error) { console.error('Canvas Authoring: node paste failed', error); new Notice(`Could not paste nodes: ${error.message}`); }
     }, true);
-    this.addCommand({id: 'copy-group', name: '复制分组数据', checkCallback: checking => {
+    this.addCommand({id: 'copy-group', name: 'Copy group data', checkCallback: checking => {
       const canvas = this.canvas(), group = this.selectedGroup(canvas);
       if (!group) return false;
       if (!checking) this.copyGroup(canvas, group);
       return true;
     }});
-    this.addCommand({id: 'paste-group', name: '从剪贴板粘贴内容', checkCallback: checking => {
+    this.addCommand({id: 'paste-group', name: 'Paste content from clipboard', checkCallback: checking => {
       const canvas = this.canvas();
       if (!canvas || canvas.readonly) return false;
       if (!checking) this.pasteGroup(canvas);
       return true;
     }});
-    this.addCommand({id: 'duplicate-selection', name: '生成副本',
+    this.addCommand({id: 'duplicate-selection', name: 'Duplicate selection',
       hotkeys: [{modifiers: ['Mod'], key: 'd'}],
       checkCallback: checking => {
         const canvas = this.canvas();
@@ -109,16 +109,16 @@ module.exports = class CanvasAuthoring extends Plugin {
         return true;
       }
     });
-    this.addCommand({id: 'add-annotation', name: '添加备注', checkCallback: checking => {
+    this.addCommand({id: 'add-annotation', name: 'Add annotation', checkCallback: checking => {
       const canvas = this.canvas();
       if (!canvas || canvas.readonly) return false;
       if (!checking) this.addAnnotation(canvas);
       return true;
     }});
     for (const [id, name, kind] of [
-      ['add-child', '添加子节点', 'child'],
-      ['add-sibling', '添加同级节点', 'sibling'],
-      ['add-next', '添加后续节点', 'next']
+      ['add-child', 'Add child node', 'child'],
+      ['add-sibling', 'Add sibling node', 'sibling'],
+      ['add-next', 'Add follow-up node', 'next']
     ]) this.addCommand({ id, name, checkCallback: checking => {
       const canvas = this.canvas();
       const node = this.selected(canvas);
@@ -146,11 +146,11 @@ module.exports = class CanvasAuthoring extends Plugin {
       this.add(canvas, node, event.key === 'Tab' ? 'child' : 'sibling');
     }, true);
     this.registerEvent(this.app.workspace.on('canvas:selection-menu', (menu, canvas) => {
-      if (this.canCopyContent(canvas)) menu.addItem(item => item.setTitle('复制').setIcon('copy').setSection('clipboard')
+      if (this.canCopyContent(canvas)) menu.addItem(item => item.setTitle('Copy').setIcon('copy').setSection('clipboard')
         .onClick(() => this.copyContent(canvas))); 
-      if (this.canCopy(canvas)) menu.addItem(item => item.setTitle('复制节点数据').setIcon('copy').setSection('clipboard')
+      if (this.canCopy(canvas)) menu.addItem(item => item.setTitle('Copy node data').setIcon('copy').setSection('clipboard')
         .onClick(() => this.copySelection(canvas)));
-      if (this.canDuplicate(canvas)) menu.addItem(item => item.setTitle('生成副本').setIcon('copy-plus').setSection('action')
+      if (this.canDuplicate(canvas)) menu.addItem(item => item.setTitle('Duplicate selection').setIcon('copy-plus').setSection('action')
         .onClick(() => this.duplicate(canvas)));
     }));
     this.registerEvent(this.app.workspace.on('canvas:node-connection-drop-menu', (menu, source, edge) => {
@@ -158,7 +158,7 @@ module.exports = class CanvasAuthoring extends Plugin {
       if (canvas.readonly) return;
       const {x, y} = edge.to.node;
       const side = edge.to.side;
-      menu.addItem(item => item.setTitle('添加备注').setSection('action').setIcon('sticky-note').onClick(() => {
+      menu.addItem(item => item.setTitle('Add annotation').setSection('action').setIcon('sticky-note').onClick(() => {
         const node = this.addAnnotation(canvas, {x, y}, side);
         // The native menu removes its unfinished edge on hide. Give the completed
         // connection a new ID so that cancellation cleanup cannot remove it.
@@ -173,21 +173,21 @@ module.exports = class CanvasAuthoring extends Plugin {
     }));
     this.registerEvent(this.app.workspace.on('canvas:node-menu', (menu, node) => {
       if (node.getData().type === 'text') {
-        menu.addItem(item => item.setTitle('字号比例').setIcon('text-cursor').onClick(event => this.fontScaleMenu(node, event)));
-        menu.addItem(item => item.setTitle('文字颜色').setIcon('type').onClick(event => this.fontColorMenu(node.canvas || this.canvas(), node, event)));
+        menu.addItem(item => item.setTitle('Font scale').setIcon('text-cursor').onClick(event => this.fontScaleMenu(node, event)));
+        menu.addItem(item => item.setTitle('Text color').setIcon('type').onClick(event => this.fontColorMenu(node.canvas || this.canvas(), node, event)));
       }
       const canvas = node.canvas || this.canvas();
-      menu.addItem(item => item.setTitle('复制').setIcon('copy').setSection('clipboard')
+      menu.addItem(item => item.setTitle('Copy').setIcon('copy').setSection('clipboard')
         .onClick(() => this.copyContent(canvas, this.selectionData(canvas, canvas.selection.has(node) ? canvas.selection : [node]))));
-      menu.addItem(item => item.setTitle('复制跳转链接').setIcon('link')
+      menu.addItem(item => item.setTitle('Copy node link').setIcon('link')
         .onClick(() => this.copyNodeLink(canvas, node)));
-      if (node.getData().type !== 'group') menu.addItem(item => item.setTitle('复制节点数据').setIcon('copy')
+      if (node.getData().type !== 'group') menu.addItem(item => item.setTitle('Copy node data').setIcon('copy')
         .onClick(() => this.copySelection(canvas)));
-      if (node.getData().type === 'group') menu.addItem(item => item.setTitle('复制分组数据').setIcon('copy')
+      if (node.getData().type === 'group') menu.addItem(item => item.setTitle('Copy group data').setIcon('copy')
         .onClick(() => this.copyGroup(canvas, node)));
-      if (this.canDuplicate(canvas)) menu.addItem(item => item.setTitle('生成副本').setIcon('copy')
+      if (this.canDuplicate(canvas)) menu.addItem(item => item.setTitle('Duplicate selection').setIcon('copy')
         .onClick(() => this.duplicate(canvas)));
-      for (const [title, kind] of [['添加子节点', 'child'], ['添加同级节点', 'sibling'], ['添加后续节点', 'next']])
+      for (const [title, kind] of [['Add child node', 'child'], ['Add sibling node', 'sibling'], ['Add follow-up node', 'next']])
         menu.addItem(item => item.setTitle(title).onClick(() => this.add(node.canvas || this.canvas(), node, kind)));
     }));
     this.registerInterval(window.setInterval(() => this.attach(), 250));
@@ -195,35 +195,35 @@ module.exports = class CanvasAuthoring extends Plugin {
   }
   nodeLink(canvas, node) {
     const file = canvas.view?.file;
-    if (!file?.path) throw new Error('请先保存画板');
+    if (!file?.path) throw new Error('Save the canvas first.');
     const data = node.getData();
-    const title = (data.label || data.text?.split('\n').find(line => line.trim()) || data.file || data.url || '查看节点')
-      .replace(/[#*|\[\]\r\n]/g, '').trim().slice(0, 60) || '查看节点';
+    const title = (data.label || data.text?.split('\n').find(line => line.trim()) || data.file || data.url || 'View node')
+      .replace(/[#*|\[\]\r\n]/g, '').trim().slice(0, 60) || 'View node';
     return `[[${file.path}#node=${encodeURIComponent(node.id)}|${title}]]`;
   }
   async copyNodeLink(canvas, node) {
     try {
       await navigator.clipboard.writeText(this.nodeLink(canvas, node));
-      new Notice('已复制跳转链接，可粘贴到文字中');
-    } catch (error) { new Notice(`复制跳转链接失败：${error.message}`); }
+      new Notice('Node link copied. Paste it into a text card or note.');
+    } catch (error) { new Notice(`Could not copy the node link: ${error.message}`); }
   }
   async jumpToNode(href, sourcePath) {
     try {
       const split = href.lastIndexOf('#node=');
       const path = href.slice(0, split), id = decodeURIComponent(href.slice(split + 6));
       const file = path ? this.app.metadataCache.getFirstLinkpathDest(path, sourcePath) : this.app.vault.getAbstractFileByPath(sourcePath);
-      if (!file || file.extension !== 'canvas') throw new Error('目标 Canvas 不存在');
+      if (!file || file.extension !== 'canvas') throw new Error('The target canvas could not be found.');
       // Check before navigating so a deleted target does not move the user's view.
       let liveData;
       this.app.workspace.iterateAllLeaves(leaf => {
         if (leaf.view?.file?.path === file.path && leaf.view.canvas) liveData = leaf.view.canvas.getData();
       });
       const data = liveData || JSON.parse(await this.app.vault.cachedRead(file));
-      if (!data.nodes?.some(n => n.id === id)) throw new Error('目标节点已删除，引用失效');
+      if (!data.nodes?.some(n => n.id === id)) throw new Error('The linked node no longer exists.');
       const leaf = this.app.workspace.getLeaf(false);
       if (leaf.view?.file?.path !== file.path) await leaf.openFile(file);
       for (let attempt = 0; attempt < 40; attempt++) {
-        if (leaf.view?.file?.path !== file.path) throw new Error('已切换画板，取消跳转');
+        if (leaf.view?.file?.path !== file.path) throw new Error('Navigation canceled because the active canvas changed.');
         const canvas = leaf.view?.canvas, node = canvas?.nodes.get(id);
         if (node) {
           canvas.deselectAll(); canvas.select(node);
@@ -233,8 +233,8 @@ module.exports = class CanvasAuthoring extends Plugin {
         }
         await new Promise(resolve => window.setTimeout(resolve, 50));
       }
-      throw new Error('目标画板未完成加载，请重试');
-    } catch (error) { new Notice(`跳转失败：${error.message}`); }
+      throw new Error('The target canvas has not loaded. Try again.');
+    } catch (error) { new Notice(`Could not open the linked node: ${error.message}`); }
   }
   canvas() { return this.app.workspace.activeLeaf?.view?.canvas; }
   selected(canvas) {
@@ -274,7 +274,7 @@ module.exports = class CanvasAuthoring extends Plugin {
     return String(text).replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
   }
   nativeClipboardData(data) {
-    if (!data.nodes.length) throw new Error('请先选中节点');
+    if (!data.nodes.length) throw new Error('Select at least one node.');
     return {...data, center: {
       x: (Math.min(...data.nodes.map(n => n.x)) + Math.max(...data.nodes.map(n => n.x + n.width))) / 2,
       y: (Math.min(...data.nodes.map(n => n.y)) + Math.max(...data.nodes.map(n => n.y + n.height))) / 2
@@ -308,7 +308,7 @@ module.exports = class CanvasAuthoring extends Plugin {
   }
   simpleClipboardText(data) {
     return this.clipboardOrder(data).map(({node:n, depth}) => {
-      if (n.type === 'group') return `${'#'.repeat(Math.min(depth+2,6))} ${n.label || '分组'}`;
+      if (n.type === 'group') return `${'#'.repeat(Math.min(depth+2,6))} ${n.label || 'Group'}`;
       if (n.type === 'text') return n.text;
       if (n.type === 'link') return n.url;
       return `[${n.file.split('/').pop()}](${this.fileLink(n.file, n.subpath)})`;
@@ -321,19 +321,19 @@ module.exports = class CanvasAuthoring extends Plugin {
     const cache = this.app.metadataCache.getFileCache(file);
     if (ref.startsWith('^')) {
       const block = cache?.blocks?.[ref.slice(1)];
-      if (!block) throw new Error(`笔记块不存在：${subpath}`);
+      if (!block) throw new Error(`Note block not found: ${subpath}`);
       return text.slice(block.position.start.offset, block.position.end.offset);
     }
     const headings = cache?.headings || [];
     const index = headings.findIndex(h => h.heading === ref);
-    if (index < 0) throw new Error(`笔记章节不存在：${subpath}`);
+    if (index < 0) throw new Error(`Note section not found: ${subpath}`);
     const start = headings[index];
     const end = headings.slice(index+1).find(h => h.level <= start.level);
     return text.slice(start.position.start.offset, end?.position.start.offset ?? text.length).trimEnd();
   }
   async imageData(file) {
     const mime = {png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',svg:'image/svg+xml',bmp:'image/bmp',avif:'image/avif'}[file.extension.toLowerCase()];
-    if (!mime) throw new Error(`不支持的图片格式：${file.extension}`);
+    if (!mime) throw new Error(`Unsupported image format: ${file.extension}`);
     const bytes = await this.app.vault.readBinary(file);
     const blob = new Blob([bytes], {type:mime});
     const url = await new Promise((resolve,reject) => {
@@ -346,10 +346,10 @@ module.exports = class CanvasAuthoring extends Plugin {
     const url = URL.createObjectURL(blob);
     try {
       const image = new Image();
-      await new Promise((resolve,reject) => { image.onload=resolve; image.onerror=()=>reject(new Error('图片无法解码')); image.src=url; });
+      await new Promise((resolve,reject) => { image.onload=resolve; image.onerror=()=>reject(new Error('Could not decode the image.')); image.src=url; });
       const surface = document.createElement('canvas'); surface.width=image.naturalWidth; surface.height=image.naturalHeight;
       surface.getContext('2d').drawImage(image,0,0);
-      return await new Promise((resolve,reject) => surface.toBlob(b => b ? resolve(b) : reject(new Error('图片编码失败')), 'image/png'));
+      return await new Promise((resolve,reject) => surface.toBlob(b => b ? resolve(b) : reject(new Error('Could not encode the image.')), 'image/png'));
     } finally { URL.revokeObjectURL(url); }
   }
   async renderedMarkdown(text, source) {
@@ -377,7 +377,7 @@ module.exports = class CanvasAuthoring extends Plugin {
     const plain=[],html=[];let image;
     for (const {node:n,depth} of this.clipboardOrder(data)) {
       if (n.type === 'group') {
-        const level=Math.min(depth+2,6), title=n.label || '分组';
+        const level=Math.min(depth+2,6), title=n.label || 'Group';
         plain.push(`${'#'.repeat(level)} ${title}`);html.push(`<h${level}>${this.escapeHtml(title)}</h${level}>`);
       } else if (n.type === 'text') {
         plain.push(n.text);html.push(await this.renderedMarkdown(n.text,source));
@@ -385,7 +385,7 @@ module.exports = class CanvasAuthoring extends Plugin {
         plain.push(n.url);html.push(`<p><a href="${this.escapeHtml(n.url)}">${this.escapeHtml(n.url)}</a></p>`);
       } else if (n.type === 'file') {
         const file=this.app.vault.getAbstractFileByPath(n.file);
-        if (!file) throw new Error(`文件不存在：${n.file}`);
+        if (!file) throw new Error(`File not found: ${n.file}`);
         if (/^(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(file.extension)) {
           const picture=await this.imageData(file);
           plain.push(`![${file.name}](${this.fileLink(file.path)})`);
@@ -415,24 +415,24 @@ module.exports = class CanvasAuthoring extends Plugin {
       if (singleImage) formats['image/png']=content.then(c => c.image);
       else formats['text/plain']=content.then(c => new Blob([c.plain],{type:'text/plain'}));
       await navigator.clipboard.write([new ClipboardItem(formats)]);
-    } catch (error) { new Notice(`复制内容失败：${error.message}`); }
+    } catch (error) { new Notice(`Could not copy content: ${error.message}`); }
   }
   async copySelection(canvas) {
     try {
       const data = this.selectionData(canvas);
-      if (!data.nodes.length) throw new Error('请先选中节点');
+      if (!data.nodes.length) throw new Error('Select at least one node.');
       await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-      new Notice(`已复制 ${data.nodes.length} 个节点到剪贴板`);
-    } catch (error) { new Notice(`复制失败：${error.message}`); }
+      new Notice(`Copied ${data.nodes.length} ${data.nodes.length === 1 ? 'node' : 'nodes'} to the clipboard.`);
+    } catch (error) { new Notice(`Could not copy: ${error.message}`); }
   }
   async copyGroup(canvas, group) {
     try {
       const data = this.groupData(canvas, group);
       await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
       const references = data.nodes.filter(n => n.type === 'file').length;
-      new Notice(`已复制分组及 ${data.nodes.length - 1} 个节点${references ? '（图片和笔记仅包含文件引用）' : ''}`);
+      new Notice(`Copied the group and its contents${references ? ' (images and notes are file references)' : ''}`);
     } catch (error) {
-      new Notice(`复制分组失败：${error.message}`);
+      new Notice(`Could not copy the group: ${error.message}`);
     }
   }
   parseGroup(text) {
@@ -440,29 +440,29 @@ module.exports = class CanvasAuthoring extends Plugin {
     const fenced = trimmed.match(/^```(?:json)?\s*\n([\s\S]*?)\n```$/i);
     const data = JSON.parse(fenced ? fenced[1] : trimmed);
     const fail = message => { throw new Error(message); };
-    if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) fail('需要包含 nodes 和 edges 的 Canvas JSON');
+    if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) fail('Expected Canvas JSON with nodes and edges arrays.');
     const ids = new Set();
     for (const n of data.nodes) {
-      if (!n || typeof n.id !== 'string' || !n.id || ids.has(n.id)) fail('节点 ID 缺失或重复');
+      if (!n || typeof n.id !== 'string' || !n.id || ids.has(n.id)) fail('Node ID is missing or duplicated.');
       ids.add(n.id);
-      if (!['text', 'file', 'link', 'group'].includes(n.type)) fail('不支持的节点类型');
-      if (![n.x, n.y, n.width, n.height].every(Number.isFinite) || n.width <= 0 || n.height <= 0) fail('节点位置或尺寸无效');
+      if (!['text', 'file', 'link', 'group'].includes(n.type)) fail('Unsupported node type.');
+      if (![n.x, n.y, n.width, n.height].every(Number.isFinite) || n.width <= 0 || n.height <= 0) fail('Invalid node position or size.');
       const field = {text:'text', file:'file', link:'url', group:'label'}[n.type];
-      if (n.type !== 'group' && typeof n[field] !== 'string') fail(`节点缺少 ${field}`);
+      if (n.type !== 'group' && typeof n[field] !== 'string') fail(`Node is missing ${field}`);
     }
-    if (!data.nodes.length) fail('剪贴板内容没有节点');
+    if (!data.nodes.length) fail('The clipboard contains no nodes.');
     const edgeIds = new Set();
     for (const e of data.edges) {
-      if (!e || typeof e.id !== 'string' || edgeIds.has(e.id)) fail('连线 ID 缺失或重复');
+      if (!e || typeof e.id !== 'string' || edgeIds.has(e.id)) fail('Edge ID is missing or duplicated.');
       edgeIds.add(e.id);
-      if (!ids.has(e.fromNode) || !ids.has(e.toNode)) fail('连线引用了分组之外或不存在的节点');
-      for (const key of ['fromSide', 'toSide']) if (e[key] !== undefined && !['top','right','bottom','left'].includes(e[key])) fail('连线方向无效');
-      for (const key of ['fromEnd', 'toEnd']) if (e[key] !== undefined && !['none','arrow'].includes(e[key])) fail('箭头类型无效');
+      if (!ids.has(e.fromNode) || !ids.has(e.toNode)) fail('An edge references a node outside the selection or a missing node.');
+      for (const key of ['fromSide', 'toSide']) if (e[key] !== undefined && !['top','right','bottom','left'].includes(e[key])) fail('Invalid edge side.');
+      for (const key of ['fromEnd', 'toEnd']) if (e[key] !== undefined && !['none','arrow'].includes(e[key])) fail('Invalid arrow type.');
     }
     return data;
   }
   insertGroup(canvas, data, position) {
-    if (canvas.readonly) throw new Error('画板只读');
+    if (canvas.readonly) throw new Error('The canvas is read-only.');
     const current = canvas.getData();
     const minX = Math.min(...data.nodes.map(n => n.x)), minY = Math.min(...data.nodes.map(n => n.y));
     // With no mouse position (command palette), append beneath the board.
@@ -493,9 +493,9 @@ module.exports = class CanvasAuthoring extends Plugin {
     try {
       const data = this.parseGroup(await navigator.clipboard.readText());
       this.insertGroup(canvas, data, position);
-      new Notice('已粘贴为新内容，原稿保留');
+      new Notice('Pasted as new content.');
     } catch (error) {
-      new Notice(`粘贴分组失败：${error.message}`);
+      new Notice(`Could not paste Canvas content: ${error.message}`);
     }
   }
   canDuplicate(canvas) {
@@ -537,7 +537,7 @@ module.exports = class CanvasAuthoring extends Plugin {
         minX + offset.dx < n.x + n.width + gap && maxX + offset.dx + gap > n.x &&
         minY + offset.dy < n.y + n.height + gap && maxY + offset.dy + gap > n.y));
       candidates.sort((a, b) => a.dx * a.dx + a.dy * a.dy - b.dx * b.dx - b.dy * b.dy);
-      if (!candidates.length) throw new Error('无法找到分组副本的空白位置');
+      if (!candidates.length) throw new Error('Could not find space for the group duplicate.');
       ({dx, dy} = candidates[0]);
     }
     const freshId = () => crypto.randomUUID().replaceAll('-', '').slice(0, 16);
@@ -580,7 +580,7 @@ module.exports = class CanvasAuthoring extends Plugin {
         });
         direction = edge.getData().fromSide;
       }
-      if (!source) { new Notice('当前节点没有唯一的来源连接，无法确定从哪里添加同级节点'); return; }
+      if (!source) { new Notice('Select a node with exactly one arrowless incoming connection to add a sibling.'); return; }
       kind = 'child';
     }
     const data = canvas.getData();
@@ -669,7 +669,7 @@ module.exports = class CanvasAuthoring extends Plugin {
         const node = create.call(this, {...options, text, ...(size ? {size} : {})});
         if (!options.size && text) plugin.fitPastedMarkdown(this, node, text).catch(error => {
           console.error('Canvas Authoring: measuring pasted Markdown failed', error);
-          new Notice('粘贴内容已保留，但无法测量排版高度');
+          new Notice('Content pasted. Could not measure the card height.');
         });
         return node;
       };
@@ -683,7 +683,7 @@ module.exports = class CanvasAuthoring extends Plugin {
     const initial = node.getData();
     const child = node.child;
     if (!child?.previewMode?.renderer || typeof node.onResizeDblclick !== 'function') {
-      throw new Error('当前 Obsidian 版本不支持原生节点高度适应');
+      throw new Error('This version of Obsidian does not support fitting the node height.');
     }
     const editing = Boolean(child.editMode);
     // Native edge fitting measures the live preview, not a separate Markdown copy.
@@ -741,9 +741,9 @@ module.exports = class CanvasAuthoring extends Plugin {
     const plugin = this;
     const wrapped = function(menu, position, size) {
       const result = original.call(this, menu, position, size);
-      if (!this.readonly) menu.addItem(item => item.setTitle('从剪贴板粘贴内容').setIcon('clipboard-paste')
+      if (!this.readonly) menu.addItem(item => item.setTitle('Paste content from clipboard').setIcon('clipboard-paste')
         .onClick(() => plugin.pasteGroup(this, position)));
-      if (!this.readonly) menu.addItem(item => item.setTitle('添加备注').setSection('create').setIcon('sticky-note')
+      if (!this.readonly) menu.addItem(item => item.setTitle('Add annotation').setSection('create').setIcon('sticky-note')
         .onClick(() => plugin.addAnnotation(this, position, undefined, size)));
       return result;
     };
@@ -766,7 +766,7 @@ module.exports = class CanvasAuthoring extends Plugin {
     const el = node.nodeEl;
     if (!el) return;
     const fontScale = data.type === 'text' ? (data.fontScale ?? 1) : 1;
-    if (!Number.isFinite(fontScale) || fontScale <= 0) throw new Error('fontScale 必须为正数');
+    if (!Number.isFinite(fontScale) || fontScale <= 0) throw new Error('fontScale must be a positive number.');
     const baseFont = parseFloat(el.ownerDocument.defaultView.getComputedStyle(node.canvas.wrapperEl).getPropertyValue('--font-text-size'));
     const fontSize = `${baseFont * fontScale}px`;
     if (data.type === 'text') {
@@ -792,7 +792,7 @@ module.exports = class CanvasAuthoring extends Plugin {
     if (emptyTransparentText && node.containerEl && !placeholder) {
       placeholder = el.ownerDocument.createElement('div');
       placeholder.className = 'canvas-authoring-empty-placeholder';
-      placeholder.textContent = '双击输入文字';
+      placeholder.textContent = 'Double-click to enter text';
       placeholder.setAttribute('aria-hidden', 'true');
       node.containerEl.appendChild(placeholder);
     }
@@ -885,7 +885,7 @@ module.exports = class CanvasAuthoring extends Plugin {
   }
   fontColorMenu(canvas, node, event) {
     const menu = new Menu();
-    const colors = [['默认', undefined], ['红色', '1'], ['橙色', '2'], ['黄色', '3'], ['绿色', '4'], ['青色', '5'], ['紫色', '6']];
+    const colors = [['Default', undefined], ['Red', '1'], ['Orange', '2'], ['Yellow', '3'], ['Green', '4'], ['Cyan', '5'], ['Purple', '6']];
     for (const [name, color] of colors) menu.addItem(item => item.setTitle(name)
       .setChecked(node.getData().fontColor === color)
       .onClick(() => this.setFontColor(canvas, node, color)));
@@ -928,7 +928,7 @@ module.exports = class CanvasAuthoring extends Plugin {
       option.className = 'canvas-color-picker-item canvas-authoring-transparent-choice';
       option.classList.toggle('is-active', transparent);
       option.setAttribute('role', 'button'); option.tabIndex = 0;
-      option.title = '透明（边框和底色）'; option.setAttribute('aria-label', '透明（边框和底色）');
+      option.title = 'Transparent background and border'; option.setAttribute('aria-label', 'Transparent background and border');
       const apply = () => {
         if (canvas.readonly) return;
         for (const node of canvas.selection) {
@@ -954,7 +954,12 @@ module.exports = class CanvasAuthoring extends Plugin {
       add.setAttribute('role', 'button');
       add.tabIndex = 0;
       add.className = 'canvas-card-menu-button canvas-authoring-new-note';
-      add.title = '添加备注'; add.setAttribute('aria-label', '添加备注');
+      add.setAttribute('aria-label', 'Add annotation');
+      if (typeof setTooltip === 'function') {
+        setTooltip(add, 'Add annotation', {placement: 'top'});
+      } else {
+        add.setAttribute('data-tooltip-position', 'top');
+      }
       setIcon(add, 'type');
       add.addEventListener('click', event => { event.stopPropagation(); this.addAnnotation(canvas); });
       add.addEventListener('keydown', event => {
@@ -973,8 +978,8 @@ module.exports = class CanvasAuthoring extends Plugin {
       button = document.createElement('button');
       button.className = 'clickable-icon canvas-authoring-style';
       button.type = 'button';
-      button.title = '文字颜色';
-      button.setAttribute('aria-label', '文字颜色');
+      button.title = 'Text color';
+      button.setAttribute('aria-label', 'Text color');
       setIcon(button, 'type');
       button.addEventListener('pointerdown', e => e.stopPropagation());
       button.addEventListener('click', event => {
@@ -989,8 +994,8 @@ module.exports = class CanvasAuthoring extends Plugin {
       scaleButton = toolbar.ownerDocument.createElement('button');
       scaleButton.className = 'clickable-icon canvas-authoring-font-scale';
       scaleButton.type = 'button';
-      scaleButton.title = '字号比例';
-      scaleButton.setAttribute('aria-label', '字号比例');
+      scaleButton.title = 'Font scale';
+      scaleButton.setAttribute('aria-label', 'Font scale');
       scaleButton.addEventListener('pointerdown', event => event.stopPropagation());
       scaleButton.addEventListener('click', event => {
         event.stopPropagation();
@@ -1007,7 +1012,7 @@ module.exports = class CanvasAuthoring extends Plugin {
   startConnection(event, canvas, node, direction, button) {
     if (canvas.readonly || !event.isPrimary || event.button !== 0) return;
     if (typeof node.onConnectionPointerdown !== 'function') {
-      new Notice('当前 Obsidian 版本不支持此连线操作'); return;
+      new Notice('This version of Obsidian does not support this connection action.'); return;
     }
     this.cancelConnectionStart?.();
     button.connectionDragged = false;
@@ -1067,14 +1072,14 @@ module.exports = class CanvasAuthoring extends Plugin {
     if (!selected || canvas.readonly || this.controls.has(selected) || !selected.nodeEl) return;
     const container = document.createElement('div');
     container.className = 'canvas-authoring-controls';
-    const labels = {top:'上', right:'右', bottom:'下', left:'左'};
+    const labels = {top: 'above', right: 'to the right', bottom: 'below', left: 'to the left'};
     for (const direction of Object.keys(labels)) {
       const button = document.createElement('button');
       button.className = `canvas-authoring-add canvas-authoring-${direction}`;
       button.textContent = '+';
       button.type = 'button';
-      button.setAttribute('aria-label', `向${labels[direction]}添加子节点`);
-      button.title = `点击向${labels[direction]}添加子节点；拖拽连接节点或在空白处新建`;
+      button.setAttribute('aria-label', `Add a child node ${labels[direction]}`);
+      button.title = `Add a child node ${labels[direction]}. Drag to connect or create a node.`;
       button.addEventListener('pointerdown', event => {
         event.stopPropagation();
         this.startConnection(event, canvas, selected, direction, button);
@@ -1186,8 +1191,8 @@ class CanvasAuthoringSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     new Setting(containerEl)
-      .setName('Claude Canvas 主题')
-      .setDesc('为 Canvas 启用浅色画布、淡彩卡片和柔和连线。')
+      .setName('Claude Canvas theme')
+      .setDesc('Use a light canvas, pastel cards, and subtle connectors.')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.claudeCanvasTheme)
         .onChange(async value => {

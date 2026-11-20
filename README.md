@@ -63,7 +63,7 @@ Example text node / 文字节点示例
 | --- | --- |
 | **Tab** adds a child card with a right-angle connector. Select one text or file card first. | **Tab** 添加子节点，并用直角折线连接。先选中一张文字或文件卡片。 |
 | **Enter** adds a sibling card from the same parent. Select a card with exactly one arrowless incoming connection. | **Enter** 从同一个上级节点展开同级节点。先选中只有一条无箭头入线的卡片。 |
-| **Directional follow-up.** Run **添加后续节点** to add a card with an arrow. Set a shortcut under **Settings → Hotkeys**. | **带箭头的后续节点。** 运行 **添加后续节点**，创建带箭头的新卡片。可在 **设置 → 快捷键** 中为它绑定按键。 |
+| **Directional follow-up.** Run **Add follow-up node** to add a card with an arrow. Set a shortcut under **Settings → Hotkeys**. | **带箭头的后续节点。** 运行 **Add follow-up node**，创建带箭头的新卡片。可在 **设置 → 快捷键** 中为它绑定按键。 |
 
 Use these keys while a card is selected and you are outside text editing.
 
@@ -81,9 +81,9 @@ Use these keys while a card is selected and you are outside text editing.
 | English | 中文 |
 | --- | --- |
 | Click a green **+** to branch in that direction, or drag it to an existing card to connect the two. Drop it on empty space to choose what to create. | 点击绿色 **+**，向该方向添加子节点。也可以把 **+** 拖到已有卡片建立关联，或拖到空白处选择要创建的卡片类型。 |
-| Right-click a card to find text formatting, annotation, and jump link actions. Look for **文字颜色**, **字号比例**, **添加备注**, and **复制跳转链接**. | 右键卡片可找到 **文字颜色**、**字号比例**、**添加备注** 和 **复制跳转链接**。 |
-| To change the appearance, open **Settings → Canvas Authoring** and toggle **Claude Canvas 主题**. | 要切换外观，打开 **设置 → Canvas Authoring**，切换 **Claude Canvas 主题**。 |
-| To edit Canvas data with an agent, use **复制节点数据** or **复制分组数据** to copy JSON. Use **从剪贴板粘贴内容** to import the edited JSON as a new copy. File cards carry vault references. | 要与 Agent 协作编辑画板，先用 **复制节点数据** 或 **复制分组数据** 获取 JSON，再用 **从剪贴板粘贴内容** 将修改后的 JSON 导入为新副本。文件卡片携带仓库内的引用。 |
+| Right-click a card to find text formatting, annotation, and jump link actions. Look for **Text color**, **Font scale**, **Add annotation**, and **Copy node link**. | 右键卡片可找到 **Text color**、**Font scale**、**Add annotation** 和 **Copy node link**。 |
+| To change the appearance, open **Settings → Canvas Authoring** and toggle **Claude Canvas theme**. | 要切换外观，打开 **设置 → Canvas Authoring**，切换 **Claude Canvas theme**。 |
+| To edit Canvas data with an agent, use **Copy node data** or **Copy group data** to copy JSON. Use **Paste content from clipboard** to import the edited JSON as a new copy. File cards carry vault references. | 要与 Agent 协作编辑画板，先用 **Copy node data** 或 **Copy group data** 获取 JSON，再用 **Paste content from clipboard** 将修改后的 JSON 导入为新副本。文件卡片携带仓库内的引用。 |
 
 ## Compatibility / 兼容性
 
