@@ -175,12 +175,6 @@ module.exports = class CanvasAuthoring extends Plugin {
       if (node.getData().type === 'text') {
         menu.addItem(item => item.setTitle('字号比例').setIcon('text-cursor').onClick(event => this.fontScaleMenu(node, event)));
         menu.addItem(item => item.setTitle('文字颜色').setIcon('type').onClick(event => this.fontColorMenu(node.canvas || this.canvas(), node, event)));
-        menu.addItem(item => item.setTitle('作为备注／评论').setChecked(node.getData().authoringStyle === 'annotation').onClick(() => {
-          const data = {...node.getData()};
-          if (data.authoringStyle === 'annotation') delete data.authoringStyle;
-          else data.authoringStyle = 'annotation';
-          node.setData(data); (node.canvas || this.canvas()).requestSave();
-        }));
       }
       const canvas = node.canvas || this.canvas();
       menu.addItem(item => item.setTitle('复制').setIcon('copy').setSection('clipboard')
@@ -762,7 +756,7 @@ module.exports = class CanvasAuthoring extends Plugin {
       pos: position || {x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2},
       size, position: position ? anchor : 'center', text: '', focus: true
     });
-    node.setData({...node.getData(), authoringStyle: 'annotation', color: 'transparent'});
+    node.setData({...node.getData(), color: 'transparent'});
     canvas.requestSave();
     this.attach();
     return node;
