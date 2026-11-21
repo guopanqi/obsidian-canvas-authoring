@@ -148,9 +148,9 @@ module.exports = class CanvasAuthoring extends Plugin {
     this.registerEvent(this.app.workspace.on('canvas:selection-menu', (menu, canvas) => {
       if (this.canCopyContent(canvas)) menu.addItem(item => item.setTitle('Copy').setIcon('copy').setSection('clipboard')
         .onClick(() => this.copyContent(canvas))); 
-      if (this.canCopy(canvas)) menu.addItem(item => item.setTitle('Copy node data').setIcon('copy').setSection('clipboard')
+      if (this.canCopy(canvas)) menu.addItem(item => item.setTitle('Copy as Canvas JSON').setIcon('braces').setSection('clipboard')
         .onClick(() => this.copySelection(canvas)));
-      if (this.canDuplicate(canvas)) menu.addItem(item => item.setTitle('Duplicate selection').setIcon('copy-plus').setSection('action')
+      if (this.canDuplicate(canvas)) menu.addItem(item => item.setTitle('Duplicate').setIcon('copy-plus').setSection('action')
         .onClick(() => this.duplicate(canvas)));
     }));
     this.registerEvent(this.app.workspace.on('canvas:node-connection-drop-menu', (menu, source, edge) => {
@@ -172,26 +172,49 @@ module.exports = class CanvasAuthoring extends Plugin {
       }));
     }));
     this.registerEvent(this.app.workspace.on('canvas:node-menu', (menu, node) => {
-      if (node.getData().type === 'text') {
-        menu.addItem(item => item.setTitle('Font scale').setIcon('text-cursor').onClick(event => this.fontScaleMenu(node, event)));
-        menu.addItem(item => item.setTitle('Text color').setIcon('type').onClick(event => this.fontColorMenu(node.canvas || this.canvas(), node, event)));
-      }
       const canvas = node.canvas || this.canvas();
-      menu.addItem(item => item.setTitle('Copy').setIcon('copy').setSection('clipboard')
-        .onClick(() => this.copyContent(canvas, this.selectionData(canvas, canvas.selection.has(node) ? canvas.selection : [node]))));
-      menu.addItem(item => item.setTitle('Copy node link').setIcon('link')
-        .onClick(() => this.copyNodeLink(canvas, node)));
-      if (node.getData().type !== 'group') menu.addItem(item => item.setTitle('Copy node data').setIcon('copy')
-        .onClick(() => this.copySelection(canvas)));
-      if (node.getData().type === 'group') menu.addItem(item => item.setTitle('Copy group data').setIcon('copy')
-        .onClick(() => this.copyGroup(canvas, node)));
-      if (this.canDuplicate(canvas)) menu.addItem(item => item.setTitle('Duplicate selection').setIcon('copy')
+      const isGroup = node.getData().type === 'group';
+
+      if (this.canDuplicate(canvas)) menu.addItem(item => item.setTitle('Duplicate').setIcon('copy-plus').setSection('action')
         .onClick(() => this.duplicate(canvas)));
-      for (const [title, kind] of [['Add child node', 'child'], ['Add sibling node', 'sibling'], ['Add follow-up node', 'next']])
-        menu.addItem(item => item.setTitle(title).onClick(() => this.add(node.canvas || this.canvas(), node, kind)));
+      if (!isGroup && !canvas.readonly) {
+        const branches = [
+          ['Add child card (Tab)', 'child', 'git-branch'],
+          ...(this.parent(canvas, node) ? [['Add sibling card (Enter)', 'sibling', 'git-fork']] : [])
+        ];
+        const addBranches = target => {
+          for (const [title, kind, icon] of branches) {
+            target.addItem(item => item.setTitle(title).setIcon(icon).setSection('action')
+              .onClick(() => this.add(canvas, node, kind)));
+          }
+        };
+        this.addSubmenu(menu, 'Mind map', 'git-branch', addBranches);
+        menu.addItem(item => item.setTitle('Add follow-up card').setIcon('arrow-right').setSection('action')
+          .onClick(() => this.add(canvas, node, 'next')));
+      }
+
+      const selection = canvas.selection.has(node) ? canvas.selection : [node];
+      menu.addItem(item => item.setTitle('Copy').setIcon('copy').setSection('clipboard')
+        .onClick(() => this.copyContent(canvas, this.selectionData(canvas, selection))));
+      menu.addItem(item => item.setTitle(isGroup ? 'Copy link to group' : 'Copy link to card').setIcon('link').setSection('clipboard')
+        .onClick(() => this.copyNodeLink(canvas, node)));
+      menu.addItem(item => item.setTitle('Copy as Canvas JSON').setIcon('braces').setSection('clipboard')
+        .onClick(() => isGroup ? this.copyGroup(canvas, node) : this.copySelection(canvas, selection)));
     }));
     this.registerInterval(window.setInterval(() => this.attach(), 250));
     this.attach();
+  }
+  addSubmenu(menu, title, icon, populate) {
+    menu.addItem(item => {
+      item.setTitle(title).setIcon(icon).setSection('action');
+      const submenu = item.setSubmenu?.();
+      if (submenu) populate(submenu);
+      else item.onClick(event => {
+        const fallback = new Menu();
+        populate(fallback);
+        fallback.showAtPosition({x: event.clientX, y: event.clientY});
+      });
+    });
   }
   nodeLink(canvas, node) {
     const file = canvas.view?.file;
@@ -417,9 +440,9 @@ module.exports = class CanvasAuthoring extends Plugin {
       await navigator.clipboard.write([new ClipboardItem(formats)]);
     } catch (error) { new Notice(`Could not copy content: ${error.message}`); }
   }
-  async copySelection(canvas) {
+  async copySelection(canvas, selection) {
     try {
-      const data = this.selectionData(canvas);
+      const data = this.selectionData(canvas, selection);
       if (!data.nodes.length) throw new Error('Select at least one node.');
       await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
       new Notice(`Copied ${data.nodes.length} ${data.nodes.length === 1 ? 'node' : 'nodes'} to the clipboard.`);
@@ -740,11 +763,26 @@ module.exports = class CanvasAuthoring extends Plugin {
     if (typeof original !== 'function') return;
     const plugin = this;
     const wrapped = function(menu, position, size) {
+      const firstCreationIndex = Array.isArray(menu.items) ? menu.items.length : undefined;
       const result = original.call(this, menu, position, size);
-      if (!this.readonly) menu.addItem(item => item.setTitle('Paste content from clipboard').setIcon('clipboard-paste')
-        .onClick(() => plugin.pasteGroup(this, position)));
-      if (!this.readonly) menu.addItem(item => item.setTitle('Add annotation').setSection('create').setIcon('sticky-note')
-        .onClick(() => plugin.addAnnotation(this, position, undefined, size)));
+      if (!this.readonly) {
+        let annotation;
+        menu.addItem(item => {
+          annotation = item;
+          item.setTitle('Add annotation').setSection('create').setIcon('sticky-note')
+            .onClick(() => plugin.addAnnotation(this, position, undefined, size));
+        });
+        // Insert after the first native creation item (Add card), irrespective of locale.
+        if (firstCreationIndex !== undefined && menu.items[firstCreationIndex]?.section === 'create') {
+          const annotationIndex = menu.items.indexOf(annotation);
+          if (annotationIndex > firstCreationIndex + 1) {
+            menu.items.splice(annotationIndex, 1);
+            menu.items.splice(firstCreationIndex + 1, 0, annotation);
+          }
+        }
+        menu.addItem(item => item.setTitle('Paste Canvas JSON').setIcon('clipboard-paste').setSection('clipboard')
+          .onClick(() => plugin.pasteGroup(this, position)));
+      }
       return result;
     };
     canvas.showCreationMenu = wrapped;
@@ -869,8 +907,12 @@ module.exports = class CanvasAuthoring extends Plugin {
     this.paintNode(node);
   }
   fontScaleMenu(node, event) {
-    const choices = new Menu();
-    for (const scale of [1, 3, 5]) choices.addItem(choice => choice.setTitle(`${scale}×`)
+    const menu = new Menu();
+    this.populateFontScales(menu, node);
+    menu.showAtMouseEvent(event);
+  }
+  populateFontScales(menu, node) {
+    for (const scale of [1, 3, 5]) menu.addItem(choice => choice.setTitle(`Font size: ${scale}×`).setSection('font-size')
       .setChecked((node.getData().fontScale ?? 1) === scale).onClick(() => {
         const data = {...node.getData()};
         if (scale === 1) delete data.fontScale;
@@ -881,15 +923,17 @@ module.exports = class CanvasAuthoring extends Plugin {
         node.canvas.requestSave();
         this.syncStyleButton(node.canvas, node.canvas.view);
       }));
-    choices.showAtMouseEvent(event);
   }
   fontColorMenu(canvas, node, event) {
     const menu = new Menu();
+    this.populateFontColors(menu, canvas, node);
+    menu.showAtMouseEvent(event);
+  }
+  populateFontColors(menu, canvas, node) {
     const colors = [['Default', undefined], ['Red', '1'], ['Orange', '2'], ['Yellow', '3'], ['Green', '4'], ['Cyan', '5'], ['Purple', '6']];
-    for (const [name, color] of colors) menu.addItem(item => item.setTitle(name)
+    for (const [name, color] of colors) menu.addItem(item => item.setTitle(`Text color: ${name}`).setSection('text-color')
       .setChecked(node.getData().fontColor === color)
       .onClick(() => this.setFontColor(canvas, node, color)));
-    menu.showAtMouseEvent(event);
   }
   observeMenus(canvas, view) {
     if (this.menuObservers.has(canvas)) return;
