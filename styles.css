@@ -20,49 +20,49 @@
 .canvas-node-connection-point.canvas-authoring-add {
   --branch-diameter: calc(var(--resizer-size) * var(--zoom-multiplier));
   --branch-axis: calc(50% + var(--branch-edge-offset, var(--branch-diameter) * 0.95));
-  --branch-inset: 1px;
+  --branch-edge-inset: 1px;
 }
 
 .canvas-node-connection-point.canvas-authoring-add[data-side='top'],
 .canvas-node-connection-point.canvas-authoring-add[data-side='bottom'] { left: var(--branch-axis); }
 .canvas-node-connection-point.canvas-authoring-add[data-side='left'],
 .canvas-node-connection-point.canvas-authoring-add[data-side='right'] { top: var(--branch-axis); }
-.canvas-node-connection-point.canvas-authoring-add[data-side='top'] { top: var(--branch-inset); }
-.canvas-node-connection-point.canvas-authoring-add[data-side='bottom'] { bottom: var(--branch-inset); }
-.canvas-node-connection-point.canvas-authoring-add[data-side='left'] { left: var(--branch-inset); }
-.canvas-node-connection-point.canvas-authoring-add[data-side='right'] { right: var(--branch-inset); }
+.canvas-node-connection-point.canvas-authoring-add[data-side='top'] { top: var(--branch-edge-inset); }
+.canvas-node-connection-point.canvas-authoring-add[data-side='bottom'] { bottom: var(--branch-edge-inset); }
+.canvas-node-connection-point.canvas-authoring-add[data-side='left'] { left: var(--branch-edge-inset); }
+.canvas-node-connection-point.canvas-authoring-add[data-side='right'] { right: var(--branch-edge-inset); }
 
-.canvas-node-connection-point.canvas-authoring-add.is-inset {
+.canvas-node-connection-point.canvas-authoring-add.is-outside {
   --branch-axis: calc(50% - var(--branch-diameter) / 2);
   --branch-gap: calc(var(--branch-diameter) / 4);
-  --branch-inset: calc(1px + var(--branch-diameter) + var(--branch-gap));
+  --branch-edge-inset: calc(1px - var(--branch-diameter) - var(--branch-gap));
 }
 
 /* Keep the edge hovered across the gap, without covering the blue handle. */
-.canvas-authoring-add.is-inset::before {
+.canvas-authoring-add.is-outside::before {
   content: '';
   position: absolute;
   pointer-events: auto;
 }
 
-.canvas-authoring-add.is-inset[data-side='top']::before,
-.canvas-authoring-add.is-inset[data-side='bottom']::before {
+.canvas-authoring-add.is-outside[data-side='top']::before,
+.canvas-authoring-add.is-outside[data-side='bottom']::before {
   width: 100%;
   height: calc(var(--branch-gap) + 1px);
   left: 0;
 }
 
-.canvas-authoring-add.is-inset[data-side='left']::before,
-.canvas-authoring-add.is-inset[data-side='right']::before {
+.canvas-authoring-add.is-outside[data-side='left']::before,
+.canvas-authoring-add.is-outside[data-side='right']::before {
   width: calc(var(--branch-gap) + 1px);
   height: 100%;
   top: 0;
 }
 
-.canvas-authoring-add.is-inset[data-side='top']::before { bottom: 100%; }
-.canvas-authoring-add.is-inset[data-side='bottom']::before { top: 100%; }
-.canvas-authoring-add.is-inset[data-side='left']::before { right: 100%; }
-.canvas-authoring-add.is-inset[data-side='right']::before { left: 100%; }
+.canvas-authoring-add.is-outside[data-side='top']::before { top: 100%; }
+.canvas-authoring-add.is-outside[data-side='bottom']::before { bottom: 100%; }
+.canvas-authoring-add.is-outside[data-side='left']::before { left: 100%; }
+.canvas-authoring-add.is-outside[data-side='right']::before { right: 100%; }
 
 /* Edge captions share card body typography; do not enlarge them at low zoom. */
 .canvas-wrapper .canvas-path-label {

@@ -6,7 +6,7 @@ const BRANCH_PLACEMENT = { spacing: 1.45, cornerClearance: 0.8, allowedOverlap: 
 function branchPlacement(length, diameter) {
   const {spacing, cornerClearance, allowedOverlap} = BRANCH_PLACEMENT;
   const center = Math.min(diameter * spacing, length / 2 - diameter * cornerClearance);
-  return {center, inset: center < diameter * (1 - allowedOverlap)};
+  return {center, outside: center < diameter * (1 - allowedOverlap)};
 }
 
 // Canvas's runtime API is internal; keep access to it in this small adapter.
@@ -1388,6 +1388,10 @@ module.exports = class CanvasAuthoring extends Plugin {
         button.dataset.side = direction;
         button.type = 'button';
         button.setAttribute('aria-label', `Add a child node ${label}`);
+        // The outside handle and its hover bridge sit beyond the native node hit area.
+        button.addEventListener('pointermove', event => {
+          if (button.classList.contains('is-outside') && event.buttons === 0) event.stopPropagation();
+        });
         button.addEventListener('pointerdown', event => {
           event.stopPropagation();
           const node = getTarget();
@@ -1418,8 +1422,8 @@ module.exports = class CanvasAuthoring extends Plugin {
       if (!diameter) continue;
       const horizontal = button.dataset.side === 'top' || button.dataset.side === 'bottom';
       const length = horizontal ? node.width : node.height;
-      const {center, inset} = branchPlacement(length, diameter);
-      button.classList.toggle('is-inset', inset);
+      const {center, outside} = branchPlacement(length, diameter);
+      button.classList.toggle('is-outside', outside);
       button.style.setProperty('--branch-edge-offset', `${center - diameter / 2}px`);
     }
   }
