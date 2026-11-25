@@ -1,18 +1,69 @@
-.canvas-authoring-controls { position: absolute; inset: 0; pointer-events: none; z-index: 20; }
-.canvas-authoring-add.canvas-authoring-add {
-  position: absolute; width: 24px; height: 24px; min-width: 0; padding: 0;
-  border-radius: 50%; border: 2px solid var(--background-primary);
-  background: #36835b; color: white; font: 20px/20px sans-serif;
-  pointer-events: auto; cursor: pointer !important; touch-action: none; box-shadow: 0 1px 4px #0004;
+.canvas-node-connection-point.canvas-authoring-add {
+  appearance: none;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  touch-action: none;
 }
-.canvas-authoring-add:hover { background: #246844; }
-.canvas-authoring-add:focus-visible { outline: 2px solid var(--text-normal); outline-offset: 2px; }
-/* Offset along the edge so native midpoint connection handles stay accessible. */
-.canvas-authoring-top { top: -34px; left: 70%; }
-.canvas-authoring-bottom { bottom: -34px; left: 70%; }
-.canvas-authoring-left { left: -34px; top: 70%; }
-.canvas-authoring-right { right: -34px; top: 70%; }
-.canvas-node.is-editing .canvas-authoring-controls { display: none; }
+
+.canvas-node-connection-point.canvas-authoring-add[hidden] { display: none; }
+
+.canvas-node-connection-point.canvas-authoring-add::after {
+  background-color: #36835b;
+  pointer-events: none;
+}
+
+.canvas-node-connection-point.canvas-authoring-add:focus-visible::after { opacity: 1; }
+
+.canvas-node-connection-point.canvas-authoring-add {
+  --branch-diameter: calc(var(--resizer-size) * var(--zoom-multiplier));
+  --branch-axis: calc(50% + var(--branch-edge-offset, var(--branch-diameter) * 0.95));
+  --branch-inset: 1px;
+}
+
+.canvas-node-connection-point.canvas-authoring-add[data-side='top'],
+.canvas-node-connection-point.canvas-authoring-add[data-side='bottom'] { left: var(--branch-axis); }
+.canvas-node-connection-point.canvas-authoring-add[data-side='left'],
+.canvas-node-connection-point.canvas-authoring-add[data-side='right'] { top: var(--branch-axis); }
+.canvas-node-connection-point.canvas-authoring-add[data-side='top'] { top: var(--branch-inset); }
+.canvas-node-connection-point.canvas-authoring-add[data-side='bottom'] { bottom: var(--branch-inset); }
+.canvas-node-connection-point.canvas-authoring-add[data-side='left'] { left: var(--branch-inset); }
+.canvas-node-connection-point.canvas-authoring-add[data-side='right'] { right: var(--branch-inset); }
+
+.canvas-node-connection-point.canvas-authoring-add.is-inset {
+  --branch-axis: calc(50% - var(--branch-diameter) / 2);
+  --branch-gap: calc(var(--branch-diameter) / 4);
+  --branch-inset: calc(1px + var(--branch-diameter) + var(--branch-gap));
+}
+
+/* Keep the edge hovered across the gap, without covering the blue handle. */
+.canvas-authoring-add.is-inset::before {
+  content: '';
+  position: absolute;
+  pointer-events: auto;
+}
+
+.canvas-authoring-add.is-inset[data-side='top']::before,
+.canvas-authoring-add.is-inset[data-side='bottom']::before {
+  width: 100%;
+  height: calc(var(--branch-gap) + 1px);
+  left: 0;
+}
+
+.canvas-authoring-add.is-inset[data-side='left']::before,
+.canvas-authoring-add.is-inset[data-side='right']::before {
+  width: calc(var(--branch-gap) + 1px);
+  height: 100%;
+  top: 0;
+}
+
+.canvas-authoring-add.is-inset[data-side='top']::before { bottom: 100%; }
+.canvas-authoring-add.is-inset[data-side='bottom']::before { top: 100%; }
+.canvas-authoring-add.is-inset[data-side='left']::before { right: 100%; }
+.canvas-authoring-add.is-inset[data-side='right']::before { left: 100%; }
+
 /* Edge captions share card body typography; do not enlarge them at low zoom. */
 .canvas-wrapper .canvas-path-label {
   background: transparent;
@@ -195,30 +246,7 @@
   border-color: var(--text-error);
 }
 
-.canvas-authoring-font-palette {
-  gap: 5px;
-  padding: 8px 10px;
-}
-
-button.canvas-authoring-font-swatch {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  flex: 0 0 24px;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--swatch-ink) 45%, transparent);
-  background: color-mix(in srgb, var(--swatch-ink) 22%, var(--background-primary));
-  box-shadow: none;
-  cursor: pointer;
-}
-
-button.canvas-authoring-font-swatch:hover,
-button.canvas-authoring-font-swatch[aria-pressed='true'] {
-  background: color-mix(in srgb, var(--swatch-ink) 28%, var(--background-primary));
-  box-shadow: 0 0 0 2px var(--swatch-ink);
-}
-
-button.canvas-authoring-font-swatch:focus-visible {
+.canvas-authoring-font-swatch:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 3px;
 }

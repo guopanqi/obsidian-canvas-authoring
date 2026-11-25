@@ -1,6 +1,13 @@
 const { Plugin, Component, Notice, Menu, Modal, Setting, PluginSettingTab, setIcon, setTooltip, MarkdownRenderer, htmlToMarkdown } = require('obsidian');
 
 const DEFAULT_SETTINGS = { claudeCanvasTheme: true };
+const BRANCH_PLACEMENT = { spacing: 1.45, cornerClearance: 0.8, allowedOverlap: 0.4 };
+
+function branchPlacement(length, diameter) {
+  const {spacing, cornerClearance, allowedOverlap} = BRANCH_PLACEMENT;
+  const center = Math.min(diameter * spacing, length / 2 - diameter * cornerClearance);
+  return {center, inset: center < diameter * (1 - allowedOverlap)};
+}
 
 // Canvas's runtime API is internal; keep access to it in this small adapter.
 module.exports = class CanvasAuthoring extends Plugin {
@@ -133,7 +140,7 @@ module.exports = class CanvasAuthoring extends Plugin {
       return true;
     }});
     this.registerDomEvent(document, 'keydown', event => {
-      if (event.isComposing) return;
+      if (event.isComposing || event.target.closest?.('.canvas-authoring-font-palette')) return;
       if (event.target.closest?.('input, textarea, [contenteditable="true"], .cm-editor')) return;
       // Canvas has its own keyboard scope. Handle duplication before that scope
       // consumes the event; keep the command as a discoverable menu entry.
@@ -1094,10 +1101,17 @@ module.exports = class CanvasAuthoring extends Plugin {
         this.syncStyleButton(node.canvas, node.canvas.view);
       }));
   }
-  toggleFontPalette(canvas, node, button) {
+  toggleFontPalette(canvas, node, button, keyboard) {
     const wasOpen = this.fontPalette?.button === button;
     this.fontPalette?.close();
     if (wasOpen) return;
+
+    const toolbar = button.parentElement;
+    if (toolbar.querySelector('.canvas-submenu .canvas-color-picker-item')) {
+      const nativeButton = [...toolbar.querySelectorAll(':scope > .clickable-icon.is-active')]
+        .find(control => control !== button);
+      nativeButton?.click();
+    }
 
     const doc = button.ownerDocument;
     const palette = doc.createElement('div');
@@ -1121,29 +1135,42 @@ module.exports = class CanvasAuthoring extends Plugin {
     const colors = [['Default', undefined], ['Red', '1'], ['Orange', '2'], ['Yellow', '3'], ['Green', '4'], ['Cyan', '5'], ['Purple', '6']];
     let selected;
     for (const [name, color] of colors) {
-      const swatch = doc.createElement('button');
+      const swatch = doc.createElement('div');
       const active = node.getData().fontColor === color;
-      swatch.type = 'button';
-      swatch.className = 'canvas-authoring-font-swatch';
+      swatch.className = 'canvas-color-picker-item canvas-authoring-font-swatch';
+      const ink = color ? `var(--canvas-color-${color})` : 'var(--text-normal)';
+      swatch.style.setProperty('--canvas-color', ink);
+      swatch.style.backgroundColor = `color-mix(in srgb, ${ink} 22%, var(--background-primary))`;
+      swatch.style.borderColor = `color-mix(in srgb, ${ink} 45%, transparent)`;
+      if (active) swatch.classList.add('is-active');
+      swatch.tabIndex = 0;
+      swatch.setAttribute('role', 'button');
       swatch.setAttribute('aria-label', name);
       swatch.setAttribute('aria-pressed', String(active));
-      swatch.style.setProperty('--swatch-ink', color ? `var(--canvas-color-${color})` : 'var(--text-normal)');
       if (typeof setTooltip === 'function') setTooltip(swatch, name, {placement: 'top'});
       if (active) selected = swatch;
       swatch.addEventListener('click', event => {
         event.stopPropagation();
         if (!canvas.readonly && this.selected(canvas) === node) this.setFontColor(canvas, node, color);
         close();
-        button.focus({preventScroll: true});
+        if (event.detail === 0) button.focus({preventScroll: true});
+      });
+      swatch.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        swatch.click();
       });
       palette.appendChild(swatch);
     }
 
     palette.addEventListener('pointerdown', event => event.stopPropagation());
     button.parentElement.appendChild(palette);
-    doc.addEventListener('pointerdown', event => {
+    const closeOutside = event => {
       if (!palette.contains(event.target) && !button.contains(event.target)) close();
-    }, {capture: true, signal});
+    };
+    doc.addEventListener('pointerdown', closeOutside, {capture: true, signal});
+    doc.addEventListener('click', closeOutside, {capture: true, signal});
     doc.addEventListener('keydown', event => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
@@ -1151,7 +1178,7 @@ module.exports = class CanvasAuthoring extends Plugin {
       close();
       button.focus({preventScroll: true});
     }, {capture: true, signal});
-    (selected || palette.firstElementChild).focus({preventScroll: true});
+    if (keyboard) (selected || palette.firstElementChild).focus({preventScroll: true});
   }
   observeMenus(canvas, view) {
     if (this.menuObservers.has(canvas)) return;
@@ -1175,6 +1202,7 @@ module.exports = class CanvasAuthoring extends Plugin {
   syncTransparentChoice(canvas, view) {
     const palettes = new Set([...view.containerEl.querySelectorAll('.canvas-color-picker-item')].map(el => el.parentElement));
     for (const palette of palettes) {
+      if (palette.classList.contains('canvas-authoring-font-palette')) continue;
       const selected = [...canvas.selection];
       const transparent = selected.length > 0 && selected.every(node => node.getData().color === 'transparent');
       const existing = palette.querySelector('.canvas-authoring-transparent-choice');
@@ -1248,11 +1276,14 @@ module.exports = class CanvasAuthoring extends Plugin {
       button.setAttribute('aria-label', 'Text color');
       button.setAttribute('aria-expanded', 'false');
       setIcon(button, 'type');
-      button.addEventListener('pointerdown', e => e.stopPropagation());
+      button.addEventListener('pointerdown', event => {
+        if (event.button === 0) event.preventDefault();
+        event.stopPropagation();
+      });
       button.addEventListener('click', event => {
         event.stopPropagation();
         const current = this.selected(canvas);
-        if (current?.getData().type === 'text' && !canvas.readonly) this.toggleFontPalette(canvas, current, button);
+        if (current?.getData().type === 'text' && !canvas.readonly) this.toggleFontPalette(canvas, current, button, event.detail === 0);
       });
       toolbar.appendChild(button);
     }
@@ -1330,44 +1361,67 @@ module.exports = class CanvasAuthoring extends Plugin {
     }
   }
   syncControls(canvas) {
-    const selected = this.selected(canvas);
-    for (const [node, element] of this.controls) {
-      if (!element.isConnected || (node.canvas === canvas && node !== selected)) {
-        element.remove(); this.controls.delete(node);
+    const layer = canvas.nodeInteractionLayer;
+    const interaction = layer?.interactionEl;
+    if (!interaction) return;
+
+    for (const [owner, record] of this.controls) {
+      if (owner !== canvas && !owner.view?.containerEl?.isConnected ||
+          owner === canvas && record.interaction !== interaction) {
+        for (const button of record.buttons) button.remove();
+        this.controls.delete(owner);
       }
     }
-    if (!selected || canvas.readonly || this.controls.has(selected) || !selected.nodeEl) return;
-    const container = document.createElement('div');
-    container.className = 'canvas-authoring-controls';
-    const labels = {top: 'above', right: 'to the right', bottom: 'below', left: 'to the left'};
-    for (const direction of Object.keys(labels)) {
-      const button = document.createElement('button');
-      button.className = `canvas-authoring-add canvas-authoring-${direction}`;
-      button.textContent = '+';
-      button.type = 'button';
-      button.setAttribute('aria-label', `Add a child node ${labels[direction]}`);
-      button.title = `Add a child node ${labels[direction]}. Drag to connect or create a node.`;
-      button.addEventListener('pointerdown', event => {
-        event.stopPropagation();
-        this.startConnection(event, canvas, selected, direction, button);
-      });
-      // Canvas starts resize/drag on press; isolate both pointer and legacy mouse events.
-      for (const type of ['mousedown', 'touchstart']) {
-        button.addEventListener(type, event => {
+    const getTarget = () => {
+      const node = layer.target;
+      return !canvas.readonly && typeof node?.onConnectionPointerdown === 'function' ? node : null;
+    };
+    let record = this.controls.get(canvas);
+    if (!record) {
+      const buttons = [];
+      const labels = {top: 'above', right: 'to the right', bottom: 'below', left: 'to the left'};
+      for (const [direction, label] of Object.entries(labels)) {
+        const resizer = interaction.querySelector(`.canvas-node-resizer[data-resize="${direction}"]`);
+        if (!resizer) continue;
+        const button = interaction.ownerDocument.createElement('button');
+        button.className = 'canvas-node-connection-point canvas-authoring-add';
+        button.dataset.side = direction;
+        button.type = 'button';
+        button.setAttribute('aria-label', `Add a child node ${label}`);
+        button.addEventListener('pointerdown', event => {
+          event.stopPropagation();
+          const node = getTarget();
+          if (node) this.startConnection(event, canvas, node, direction, button);
+        });
+        button.addEventListener('dblclick', event => event.stopPropagation());
+        button.addEventListener('click', event => {
           event.preventDefault();
           event.stopPropagation();
-        }, {passive: false});
+          const dragged = button.connectionDragged;
+          button.connectionDragged = false;
+          if (dragged && event.detail !== 0) return;
+          const node = getTarget();
+          if (node) this.add(canvas, node, 'child', direction);
+        });
+        resizer.appendChild(button);
+        buttons.push(button);
       }
-      button.addEventListener('dblclick', event => event.stopPropagation());
-      button.addEventListener('click', event => {
-        event.preventDefault(); event.stopPropagation();
-        if (button.connectionDragged) { button.connectionDragged = false; return; }
-        this.add(canvas, selected, 'child', direction);
-      });
-      container.appendChild(button);
+      record = {interaction, buttons};
+      this.controls.set(canvas, record);
     }
-    selected.nodeEl.appendChild(container);
-    this.controls.set(selected, container);
+    const node = getTarget();
+    for (const button of record.buttons) {
+      button.hidden = !node;
+      if (!node || !interaction.isConnected) continue;
+      const native = button.parentElement.querySelector('.canvas-node-connection-point:not(.canvas-authoring-add)');
+      const diameter = native?.offsetWidth;
+      if (!diameter) continue;
+      const horizontal = button.dataset.side === 'top' || button.dataset.side === 'bottom';
+      const length = horizontal ? node.width : node.height;
+      const {center, inset} = branchPlacement(length, diameter);
+      button.classList.toggle('is-inset', inset);
+      button.style.setProperty('--branch-edge-offset', `${center - diameter / 2}px`);
+    }
   }
   draw(edge) {
     const data = edge.getData();
@@ -1435,7 +1489,7 @@ module.exports = class CanvasAuthoring extends Plugin {
       el.classList.remove('canvas-authoring-transparent', 'canvas-authoring-font-color');
       el.style.removeProperty('--authoring-font-color');
     });
-    for (const element of this.controls.values()) element.remove();
+    for (const {buttons} of this.controls.values()) for (const button of buttons) button.remove();
     this.controls.clear();
     for (const [edge, {original, wrapped}] of this.patched) {
       if (edge.updatePath === wrapped) edge.updatePath = original;

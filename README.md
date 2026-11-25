@@ -83,7 +83,7 @@ Use these keys while a card is selected and you are outside text editing.
 
 | English | 中文 |
 | --- | --- |
-| Click a green **+** to branch in that direction, or drag it to an existing card to connect the two. Drop it on empty space to choose what to create. | 点击绿色 **+**，向该方向添加子节点。也可以把 **+** 拖到已有卡片建立关联，或拖到空白处选择要创建的卡片类型。 |
+| Hover over a card edge to reveal the green branch handle beside the native connector. Click it to branch or drag it to connect to an existing card. Drop it on empty space to choose what to create. | 悬停在卡片边缘时，原生连接点旁会出现绿色分支点。点击可添加子节点，也可以拖到已有卡片建立关联，或拖到空白处选择要创建的卡片类型。 |
 | Select a text card and use **Text color** or **Font scale** on its floating toolbar. Right-click empty space to find **Add annotation** below **Add card**. | 选中文字卡片后，在浮动工具栏调整 **Text color** 或 **Font scale**。右键点击空白处，**Add annotation** 位于 **Add card** 下方。 |
 | To change the appearance, open **Settings → Canvas Authoring** and toggle **Claude Canvas theme**. | 要切换外观，打开 **设置 → Canvas Authoring**，切换 **Claude Canvas theme**。 |
 | To edit Canvas data with an agent, use **Copy node data** or **Copy group data** to copy JSON. Use **Paste content from clipboard** to import the edited JSON as a new copy. File cards carry vault references. | 要与 Agent 协作编辑画板，先用 **Copy node data** 或 **Copy group data** 获取 JSON，再用 **Paste content from clipboard** 将修改后的 JSON 导入为新副本。文件卡片携带仓库内的引用。 |
