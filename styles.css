@@ -116,6 +116,66 @@
   color: var(--icon-color-hover);
 }
 
+.modal.canvas-authoring-mermaid-modal {
+  width: min(960px, 94vw);
+}
+
+.canvas-authoring-mermaid-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.canvas-authoring-mermaid-columns > textarea,
+.canvas-authoring-mermaid-preview {
+  box-sizing: border-box;
+  height: clamp(12rem, 42vh, 30rem);
+  min-width: 0;
+}
+
+.canvas-authoring-mermaid-columns > textarea {
+  width: 100%;
+  font-family: var(--font-monospace);
+  resize: none;
+}
+
+.canvas-authoring-mermaid-preview {
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+}
+
+.canvas-authoring-mermaid-preview > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 650px) {
+  .canvas-authoring-mermaid-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.canvas-authoring-mermaid-measure {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 1200px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.canvas-authoring-mermaid-preview-card {
+  padding: 12px 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 14px/1.4 var(--font-text);
+  color: var(--text-normal);
+}
+
 /* Optional bundled Claude Canvas theme, enabled by plugin setting. */
 body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] {
   color-scheme: light;

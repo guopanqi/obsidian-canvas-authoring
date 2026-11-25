@@ -69,6 +69,16 @@ Use these keys while a card is selected and you are outside text editing.
 
 选中卡片并退出文字编辑后，即可使用这些快捷键。
 
+### Import Mermaid diagrams / 导入 Mermaid 图表
+
+Open **Import Mermaid diagram** from the canvas context menu or command palette. Paste a flowchart or mind map with or without its Markdown code fence. The dialog identifies the diagram, shows a preview, and reports errors before enabling import.
+
+从画布空白处的右键菜单或命令面板打开 **Import Mermaid diagram**。粘贴流程图或思维导图源码，可带或不带 Markdown 代码块。面板会识别类型、显示预览，并在允许导入前提示错误。
+
+Flowcharts support `TD`, `TB`, `BT`, `LR`, and `RL`, including basic node labels, chains, and edge labels. Mind maps turn indented branches into cards with arrowless links. The importer supports basic mind map labels and shapes. Other diagram types can be kept as Mermaid blocks in text cards.
+
+流程图支持 `TD`、`TB`、`BT`、`LR` 和 `RL`，包括基本节点标签、链式连线和连线标签。思维导图按缩进生成卡片和无箭头连线，支持基本节点文字与形状写法。其他图表可保留在文字卡片的 Mermaid 代码块里。
+
 ## Installation / 安装
 
 | English | 中文 |

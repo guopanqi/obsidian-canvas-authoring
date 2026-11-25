@@ -1,4 +1,4 @@
-const { Plugin, Notice, Menu, Setting, PluginSettingTab, setIcon, setTooltip, MarkdownRenderer, htmlToMarkdown } = require('obsidian');
+const { Plugin, Component, Notice, Menu, Modal, Setting, PluginSettingTab, setIcon, setTooltip, MarkdownRenderer, htmlToMarkdown } = require('obsidian');
 
 const DEFAULT_SETTINGS = { claudeCanvasTheme: true };
 
@@ -98,6 +98,12 @@ module.exports = class CanvasAuthoring extends Plugin {
       const canvas = this.canvas();
       if (!canvas || canvas.readonly) return false;
       if (!checking) this.pasteGroup(canvas);
+      return true;
+    }});
+    this.addCommand({id: 'import-mermaid', name: 'Import Mermaid diagram', checkCallback: checking => {
+      const canvas = this.canvas();
+      if (!canvas || canvas.readonly) return false;
+      if (!checking) this.importMermaid(canvas);
       return true;
     }});
     this.addCommand({id: 'duplicate-selection', name: 'Duplicate selection',
@@ -521,6 +527,152 @@ module.exports = class CanvasAuthoring extends Plugin {
       new Notice(`Could not paste Canvas content: ${error.message}`);
     }
   }
+  importMermaid(canvas, position) {
+    const modal = new Modal(this.app);
+    modal.setTitle('Import Mermaid diagram');
+    modal.modalEl.classList.add('canvas-authoring-mermaid-modal');
+    modal.contentEl.createEl('p', {text: 'Paste a flowchart or mind map, with or without Mermaid code fences.'});
+    const columns = modal.contentEl.createDiv({cls: 'canvas-authoring-mermaid-columns'});
+    const input = columns.createEl('textarea', {
+      attr: {'aria-label': 'Mermaid source', rows: '14', spellcheck: 'false'}
+    });
+    const preview = columns.createDiv({
+      cls: 'canvas-authoring-mermaid-preview',
+      attr: {'aria-label': 'Mermaid preview', role: 'region'}
+    });
+    const message = modal.contentEl.createDiv({attr: {role: 'status', 'aria-live': 'polite'}});
+    message.textContent = 'Paste Mermaid source to see a preview.';
+    let revision = 0;
+    let timer;
+    let component;
+    let pending;
+    let importButton;
+    modal.onClose = () => {
+      revision++;
+      clearTimeout(timer);
+      if (component) this.removeChild(component);
+      component = undefined;
+    };
+    new Setting(modal.contentEl).addButton(button => {
+      importButton = button.setButtonText('Import').setCta().setDisabled(true).onClick(() => {
+        if (!pending) return;
+        try {
+          this.insertGroup(canvas, pending, position);
+          modal.close();
+          new Notice('Mermaid diagram imported.');
+        } catch (error) {
+          message.textContent = error.message;
+        }
+      });
+    });
+
+    input.addEventListener('input', () => {
+      const current = ++revision;
+      clearTimeout(timer);
+      pending = undefined;
+      importButton.setDisabled(true);
+      if (component) this.removeChild(component);
+      component = undefined;
+      preview.empty();
+      const source = input.value.trim();
+      message.textContent = source ? 'Checking Mermaid source…' : 'Paste Mermaid source to see a preview.';
+      if (!source) return;
+      timer = setTimeout(async () => {
+        let kind = '';
+        try {
+          const body = unwrapMermaid(source);
+          const direction = body.match(/^(?:flowchart|graph)[ \t]+(TB|TD|BT|LR|RL)\b/)?.[1];
+          const mindMap = /^mindmap\b/.test(body);
+          kind = mindMap ? 'Mind map' : direction ? `Flowchart (${direction})` : '';
+          const data = this.parseGroup(JSON.stringify(mindMap ? mindMapToCanvas(body) : mermaidToCanvas(body)));
+          message.textContent = `${kind} · Rendering preview…`;
+          let matched = false;
+          if (!mindMap) {
+            const host = preview.createDiv({cls: 'markdown-rendered canvas-authoring-mermaid-measure'});
+            component = new Component();
+            this.addChild(component);
+            const fence = '`'.repeat(Math.max(3, ...[...body.matchAll(/`+/g)].map(match => match[0].length + 1)));
+            await MarkdownRenderer.render(this.app, `${fence}mermaid\n${body}\n${fence}`, host, canvas.view.file?.path || '', component);
+            if (current !== revision) return;
+            matched = await this.applyRenderedMermaidLayout(host, direction, data);
+            if (current !== revision) return;
+            const svg = host.querySelector('.mermaid svg');
+            const renderError = host.textContent.trim().slice(0, 240);
+            this.removeChild(component);
+            component = undefined;
+            host.remove();
+            if (!matched && !svg?.querySelector('g.pele-node, g.node')) {
+              throw new Error(renderError || 'Could not render a Mermaid flowchart.');
+            }
+          }
+          renderCanvasImportPreview(preview, data);
+          pending = data;
+          message.textContent = `${kind} · ${data.nodes.length} cards · ${data.edges.length} links` +
+            (!mindMap && !matched ? ' · Using automatic Canvas placement.' : '');
+          importButton.setDisabled(false);
+        } catch (error) {
+          if (current !== revision) return;
+          message.textContent = kind ? `${kind} · ${error.message}` : error.message;
+        }
+      }, 300);
+    });
+    modal.open();
+    input.focus();
+  }
+  async applyRenderedMermaidLayout(host, direction, data) {
+    const doc = host.ownerDocument;
+    try {
+      // Mermaid can finish after MarkdownRenderer resolves.
+      for (let attempt = 0; attempt < 30 && host.isConnected; attempt++) {
+        const svg = host.querySelector('.mermaid svg');
+        const matrix = svg?.getScreenCTM?.();
+        const boxes = new Map();
+        if (matrix) {
+          const inverse = matrix.inverse();
+          const byId = new Map(data.nodes.map(node => [node.id, node]));
+          // Pele uses data-id; older Mermaid renderers encode the ID in the element ID.
+          for (const el of svg.querySelectorAll('g.pele-node[data-id], g.node')) {
+            const id = el.getAttribute('data-id') || el.id.match(/^flowchart-(.+)-[0-9]+$/)?.[1];
+            const transform = el.getScreenCTM?.();
+            if (!byId.has(id) || !transform) continue;
+            const box = el.getBBox();
+            const coordinates = inverse.multiply(transform);
+            const start = new doc.defaultView.DOMPoint(box.x, box.y).matrixTransform(coordinates);
+            const end = new doc.defaultView.DOMPoint(box.x + box.width, box.y + box.height).matrixTransform(coordinates);
+            const bounds = {x: start.x, y: start.y, width: end.x - start.x, height: end.y - start.y};
+            if (Object.values(bounds).every(Number.isFinite) && bounds.width > 0 && bounds.height > 0) boxes.set(id, bounds);
+          }
+        }
+        if (boxes.size === data.nodes.length) {
+          // Scale the whole diagram together to leave room for Canvas card padding.
+          const scale = Math.max(1, ...[...boxes.values()].map(box => Math.max(54 / box.height, 88 / box.width)));
+          const centers = new Map();
+          for (const node of data.nodes) {
+            const box = boxes.get(node.id);
+            for (const key of ['x', 'y', 'width', 'height']) node[key] = box[key] * scale;
+            centers.set(node.id, {x: node.x + node.width / 2, y: node.y + node.height / 2});
+          }
+          const horizontal = direction === 'LR' || direction === 'RL';
+          for (const edge of data.edges) {
+            if (edge.fromNode === edge.toNode) continue;
+            const from = centers.get(edge.fromNode);
+            const to = centers.get(edge.toNode);
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const across = horizontal ? Math.abs(dx) >= 1 : Math.abs(dy) < 1;
+            [edge.fromSide, edge.toSide] = across
+              ? (dx >= 0 ? ['right', 'left'] : ['left', 'right'])
+              : (dy >= 0 ? ['bottom', 'top'] : ['top', 'bottom']);
+          }
+          return true;
+        }
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    } catch (error) {
+      console.warn('Canvas Authoring: Mermaid layout unavailable', error);
+    }
+    return false;
+  }
   canDuplicate(canvas) {
     if (!canvas || canvas.readonly || !canvas.selection.size) return false;
     const active = document.activeElement;
@@ -780,6 +932,8 @@ module.exports = class CanvasAuthoring extends Plugin {
             menu.items.splice(firstCreationIndex + 1, 0, annotation);
           }
         }
+        menu.addItem(item => item.setTitle('Import Mermaid diagram…').setIcon('git-branch').setSection('clipboard')
+          .onClick(() => plugin.importMermaid(this, position)));
         menu.addItem(item => item.setTitle('Paste Canvas JSON').setIcon('clipboard-paste').setSection('clipboard')
           .onClick(() => plugin.pasteGroup(this, position)));
       }
@@ -1161,11 +1315,7 @@ module.exports = class CanvasAuthoring extends Plugin {
     };
     const a = endpoint(edge.from), b = endpoint(edge.to);
     if (!a || !b) return;
-    const mid = (a.x + b.x) / 2;
-    const vertical = data.fromSide === 'top' || data.fromSide === 'bottom';
-    const midY = (a.y + b.y) / 2;
-    const elbow = vertical ? `M ${a.x} ${a.y} L ${a.x} ${midY} L ${b.x} ${midY} L ${b.x} ${b.y}` : `M ${a.x} ${a.y} L ${mid} ${a.y} L ${mid} ${b.y} L ${b.x} ${b.y}`;
-    const path = elbow;
+    const path = orthogonalCanvasPath(a, b, data.fromSide, data.toSide);
     for (const element of [edgePath.display, edgePath.interaction]) {
       if (element && element.getAttribute('d') !== path) element.setAttribute('d', path);
     }
@@ -1244,5 +1394,319 @@ class CanvasAuthoringSettingTab extends PluginSettingTab {
           this.plugin.updateThemeClass();
           await this.plugin.saveData(this.plugin.settings);
         }));
+  }
+}
+
+// Parse a small flowchart subset into the same data format as Canvas JSON paste.
+function mermaidToCanvas(source) {
+  let body = source;
+  const header = body.match(/^(?:flowchart|graph)[ \t]+(TB|TD|BT|LR|RL)(?:[ \t]*(?:\r?\n|;|$))/);
+  if (!header) throw new Error('Expected mindmap or a flowchart with direction TD, TB, BT, LR, or RL. Only flowcharts and mind maps can be imported.');
+  const direction = header[1];
+  body = body.slice(header[0].length);
+  const nodes = new Map();
+  const edges = [];
+  // Consume complete node and edge labels before looking for statement separators.
+  const nodePattern = /([\p{L}\p{N}_][\p{L}\p{N}_-]*?)(?=-->|---|<-->|==>|-\.->|[\s;[({]|$)(?:(?:\[\[("[^"]*"|[^\]\n]+)\]\]|\[("[^"]*"|[^\]\n]+)\]|\(\(("[^"]*"|[^)\n]+)\)\)|\(("[^"]*"|[^)\n]+)\)|\{("[^"]*"|[^}\n]+)\}))?/uy;
+  const connector = /(<-->|-->|---|==>|-\.->)(?:[ \t]*\|([^|\r\n]*)\|)?/y;
+  let cursor = 0;
+  const skipSpaces = () => {
+    while (/[ \t\r]/.test(body[cursor] || '')) cursor++;
+  };
+  const fail = () => {
+    const line = body.slice(0, cursor).split('\n').length + 1;
+    throw new Error(`Unsupported Mermaid syntax near line ${line} of the diagram. Use simple flowchart nodes and links.`);
+  };
+  const clean = text => text.trim().replace(/^"(.*)"$/, '$1').replace(/<br\s*\/?>/gi, '\n');
+  const readNode = () => {
+    nodePattern.lastIndex = cursor;
+    const match = nodePattern.exec(body);
+    if (!match) fail();
+    cursor = nodePattern.lastIndex;
+    const [, id, ...labels] = match;
+    const label = labels.find(value => value !== undefined);
+    if (label !== undefined || !nodes.has(id)) nodes.set(id, label === undefined ? id : clean(label));
+    return id;
+  };
+  while (cursor < body.length) {
+    skipSpaces();
+    if (cursor === body.length) break;
+    if (body.startsWith('%%', cursor)) {
+      const end = body.indexOf('\n', cursor);
+      cursor = end < 0 ? body.length : end;
+    }
+    if (body[cursor] === ';' || body[cursor] === '\n') { cursor++; continue; }
+    if (cursor === body.length) break;
+
+    let fromNode = readNode();
+    while (cursor < body.length) {
+      skipSpaces();
+      if (cursor === body.length || body[cursor] === ';' || body[cursor] === '\n' || body.startsWith('%%', cursor)) break;
+      connector.lastIndex = cursor;
+      const link = connector.exec(body);
+      if (!link) fail();
+      cursor = connector.lastIndex;
+      skipSpaces();
+      const toNode = readNode();
+      const [, arrow, label] = link;
+      edges.push({
+        id: String(edges.length), fromNode, toNode,
+        fromEnd: arrow === '<-->' ? 'arrow' : 'none',
+        toEnd: arrow === '---' ? 'none' : 'arrow',
+        ...(label === undefined ? {} : {label: clean(label)})
+      });
+      fromNode = toNode;
+    }
+  }
+  if (!nodes.size) throw new Error('The flowchart contains no cards.');
+
+  const outgoing = new Map([...nodes.keys()].map(id => [id, []]));
+  const incoming = new Set();
+  for (const edge of edges) {
+    outgoing.get(edge.fromNode).push(edge.toNode);
+    incoming.add(edge.toNode);
+  }
+
+  // Ignore back edges for ranking only. Keep them in the imported diagram.
+  const levels = new Map([...nodes.keys()].map(id => [id, 0]));
+  const forwardEdges = new Map([...nodes.keys()].map(id => [id, []]));
+  const state = new Map();
+  const order = [];
+  const visit = root => {
+    if (state.has(root)) return;
+    const stack = [{id: root, next: 0}];
+    state.set(root, 'visiting');
+    while (stack.length) {
+      const frame = stack[stack.length - 1];
+      const children = outgoing.get(frame.id);
+      if (frame.next === children.length) {
+        state.set(frame.id, 'finished');
+        order.push(frame.id);
+        stack.pop();
+        continue;
+      }
+      const child = children[frame.next++];
+      if (state.get(child) === 'visiting') continue;
+      forwardEdges.get(frame.id).push(child);
+      if (!state.has(child)) {
+        state.set(child, 'visiting');
+        stack.push({id: child, next: 0});
+      }
+    }
+  };
+  for (const id of nodes.keys()) if (!incoming.has(id)) visit(id);
+  for (const id of nodes.keys()) visit(id);
+  for (const id of order.reverse()) {
+    for (const child of forwardEdges.get(id)) {
+      levels.set(child, Math.max(levels.get(child), levels.get(id) + 1));
+    }
+  }
+
+  const horizontal = direction === 'LR' || direction === 'RL';
+  const reversed = direction === 'RL' || direction === 'BT';
+  const layers = [];
+  const neighbors = new Map([...nodes.keys()].map(id => [id, new Set()]));
+  for (const edge of edges) {
+    neighbors.get(edge.fromNode).add(edge.toNode);
+    neighbors.get(edge.toNode).add(edge.fromNode);
+  }
+  for (const [id, level] of levels) (layers[level] ??= []).push(id);
+
+  // Sweep in both directions so cards tend to line up with their connected neighbors.
+  const slots = new Map();
+  const assignSlots = layer => layer.forEach((id, i) => slots.set(id, i - (layer.length - 1) / 2));
+  layers.forEach(assignSlots);
+  for (const step of [1, -1, 1, -1]) {
+    for (let level = step > 0 ? 0 : layers.length - 1; level >= 0 && level < layers.length; level += step) {
+      const layer = layers[level];
+      const scores = new Map(layer.map(id => {
+        const adjacent = [...neighbors.get(id)].filter(other => (level - levels.get(other)) * step > 0);
+        return [id, adjacent.length ? adjacent.reduce((sum, other) => sum + slots.get(other), 0) / adjacent.length : slots.get(id)];
+      }));
+      layer.sort((a, b) => scores.get(a) - scores.get(b));
+      assignSlots(layer);
+    }
+  }
+
+  const cards = [];
+  const byId = new Map();
+  const estimateWidth = text => [...text].reduce((width, char) => width + (/[^\x00-\xff]/.test(char) ? 16 : 9), 0);
+  const labelSpace = edges.reduce((max, edge) => Math.max(max, estimateWidth(edge.label || '')), 0);
+  const crossGap = 84 + Math.min(140, labelSpace);
+  const rankGap = 112 + Math.min(160, labelSpace);
+  let primary = 0;
+  for (const layer of layers) {
+    const row = layer.map(id => {
+      const text = nodes.get(id);
+      const lines = text.split('\n');
+      const longest = Math.max(...lines.map(estimateWidth));
+      const width = Math.max(140, Math.min(300, longest + 44));
+      const rows = lines.reduce((count, line) => count + Math.max(1, Math.ceil(estimateWidth(line) / (width - 40))), 0);
+      return {id, text, type: 'text', width, height: Math.max(56, rows * 22 + 32)};
+    });
+    const primarySize = Math.max(...row.map(card => horizontal ? card.width : card.height));
+    const crossSize = row.reduce((size, card) => size + (horizontal ? card.height : card.width), 0) + crossGap * (row.length - 1);
+    let cross = -crossSize / 2;
+    for (const card of row) {
+      const extent = horizontal ? card.width : card.height;
+      const along = primary + (primarySize - extent) / 2;
+      const offset = reversed ? -along - extent : along;
+      card.x = horizontal ? offset : cross;
+      card.y = horizontal ? cross : offset;
+      cross += (horizontal ? card.height : card.width) + crossGap;
+      cards.push(card);
+      byId.set(card.id, card);
+    }
+    primary += primarySize + rankGap;
+  }
+
+  for (const edge of edges) {
+    const from = byId.get(edge.fromNode);
+    const to = byId.get(edge.toNode);
+    const dx = (to.x + to.width / 2) - (from.x + from.width / 2);
+    const dy = (to.y + to.height / 2) - (from.y + from.height / 2);
+    const sameLayer = levels.get(from.id) === levels.get(to.id);
+    if (from === to) {
+      [edge.fromSide, edge.toSide] = ['right', 'bottom'];
+    } else if (horizontal !== sameLayer) {
+      [edge.fromSide, edge.toSide] = dx >= 0 ? ['right', 'left'] : ['left', 'right'];
+    } else {
+      [edge.fromSide, edge.toSide] = dy >= 0 ? ['bottom', 'top'] : ['top', 'bottom'];
+    }
+  }
+  return {nodes: cards, edges};
+}
+
+function unwrapMermaid(source) {
+  const text = source.trim();
+  const opening = text.match(/^(`{3,}|~{3,})[ \t]*(?:mermaid)?[ \t]*\r?\n/i);
+  let body = text;
+  if (opening) {
+    const close = new RegExp(`\\r?\\n[ \\t]*${opening[1][0]}{${opening[1].length},}[ \\t]*$`);
+    if (!close.test(text)) throw new Error('The Mermaid code block is missing its closing fence.');
+    body = text.slice(opening[0].length).replace(close, '');
+  } else if (/^(`{3,}|~{3,})/.test(text)) {
+    throw new Error('Use a Mermaid code block or paste the diagram source directly.');
+  } else {
+    body = body.replace(/^mermaid[ \t]*\r?\n/i, '');
+  }
+  return body.trim();
+}
+
+function mindMapToCanvas(body) {
+  const lines = body.split(/\r?\n/);
+  if (!/^mindmap[ \t]*$/.test(lines[0])) throw new Error('Put mindmap on its own line.');
+  const nodes = [];
+  const edges = [];
+  const stack = [];
+  const depths = [];
+  let y = 0;
+  const shape = /^[\p{L}\p{N}_-]+\s*(\(\(|\)\)|\{\{|\[|\(|\))/u;
+  const endings = {'((': '))', '))': '((', '{{': '}}', '[': ']', '(': ')', ')': '('};
+  for (let index = 1; index < lines.length; index++) {
+    const line = lines[index];
+    let text = line.trim();
+    if (!text || text.startsWith('%%')) continue;
+    if (/^(?:::icon|:::)/.test(text)) throw new Error(`Icons and classes are not supported on line ${index + 1}.`);
+    const indent = line.match(/^\s*/)[0].replace(/\t/g, '    ').length;
+    const match = text.match(shape);
+    if (match) {
+      const end = endings[match[1]];
+      if (!text.endsWith(end)) throw new Error(`Unclosed mind map node shape on line ${index + 1}.`);
+      text = text.slice(match[0].length, -end.length).trim().replace(/^"(.*)"$/, '$1');
+    }
+    if (!text) throw new Error(`Missing node text on line ${index + 1}.`);
+    text = text.replace(/<br\s*\/?>/gi, '\n');
+    while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+    if (nodes.length && !stack.length) throw new Error(`Line ${index + 1} must be indented under the root node.`);
+    const id = String(nodes.length);
+    const depth = stack.length;
+    const labelLines = text.split('\n');
+    const textWidths = labelLines.map(line => [...line].reduce((width, char) =>
+      width + (/[^\x00-\xff]/.test(char) ? 16 : 9), 0));
+    const width = Math.max(120, Math.min(280, Math.max(...textWidths) + 40));
+    const rows = textWidths.reduce((count, length) => count + Math.max(1, Math.ceil(length / (width - 32))), 0);
+    const height = Math.max(52, rows * 20 + 28);
+    if (depth === 1 && depths[1]) y += 16;
+    const node = {id, text, type: 'text', x: 0, y, width, height};
+    (depths[depth] ??= []).push(node);
+    nodes.push(node);
+    y += height + 20;
+    if (depth) edges.push({
+      id, fromNode: stack[depth - 1].id, toNode: id,
+      fromSide: 'bottom', toSide: 'left', fromEnd: 'none', toEnd: 'none'
+    });
+    stack.push({id, indent});
+  }
+  if (!nodes.length) throw new Error('Add a root node below mindmap.');
+  let x = 0;
+  for (const layer of depths) {
+    for (const node of layer) node.x = x;
+    x += Math.max(...layer.map(node => node.width)) / 2 + 32;
+  }
+  return {nodes, edges};
+}
+
+function orthogonalCanvasPath(a, b, fromSide, toSide) {
+  const vertical = side => side === 'top' || side === 'bottom';
+  if (fromSide === 'bottom' && toSide === 'left' && b.x > a.x && b.y > a.y) {
+    return `M ${a.x} ${a.y} L ${a.x} ${b.y} L ${b.x} ${b.y}`;
+  }
+  const midX = (a.x + b.x) / 2;
+  const midY = (a.y + b.y) / 2;
+  return vertical(fromSide)
+    ? `M ${a.x} ${a.y} L ${a.x} ${midY} L ${b.x} ${midY} L ${b.x} ${b.y}`
+    : `M ${a.x} ${a.y} L ${midX} ${a.y} L ${midX} ${b.y} L ${b.x} ${b.y}`;
+}
+
+function renderCanvasImportPreview(container, data) {
+  const doc = container.ownerDocument;
+  const svgNode = (tag, attrs, parent) => {
+    const element = doc.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value);
+    parent.appendChild(element);
+    return element;
+  };
+  const minX = Math.min(...data.nodes.map(node => node.x)) - 24;
+  const minY = Math.min(...data.nodes.map(node => node.y)) - 24;
+  const width = Math.max(...data.nodes.map(node => node.x + node.width)) - minX + 24;
+  const height = Math.max(...data.nodes.map(node => node.y + node.height)) - minY + 24;
+  const svg = svgNode('svg', {viewBox: `${minX} ${minY} ${width} ${height}`, width: '100%', height: '100%', preserveAspectRatio: 'xMidYMid meet', role: 'img', 'aria-label': 'Canvas import layout'}, container);
+  const markerId = `canvas-preview-arrow-${crypto.randomUUID()}`;
+  const marker = svgNode('marker', {id: markerId, markerWidth: 7, markerHeight: 7, refX: 7, refY: 3.5, orient: 'auto-start-reverse'}, svgNode('defs', {}, svg));
+  svgNode('path', {d: 'M 0 0 L 7 3.5 L 0 7 z', fill: 'var(--text-muted)'}, marker);
+  const byId = new Map(data.nodes.map(node => [node.id, node]));
+  const vectors = {top: [0, -1], right: [1, 0], bottom: [0, 1], left: [-1, 0]};
+  const anchor = (node, side) => {
+    const [dx, dy] = vectors[side];
+    return {x: node.x + node.width * (1 + dx) / 2, y: node.y + node.height * (1 + dy) / 2};
+  };
+  for (const edge of data.edges) {
+    const a = anchor(byId.get(edge.fromNode), edge.fromSide);
+    const b = anchor(byId.get(edge.toNode), edge.toSide);
+    const [ax, ay] = vectors[edge.fromSide];
+    const [bx, by] = vectors[edge.toSide];
+    const reach = Math.max(30, Math.hypot(b.x - a.x, b.y - a.y) / 2);
+    const directed = edge.fromEnd === 'arrow' || edge.toEnd === 'arrow';
+    const d = directed
+      ? `M ${a.x} ${a.y} C ${a.x + ax * reach} ${a.y + ay * reach} ${b.x + bx * reach} ${b.y + by * reach} ${b.x} ${b.y}`
+      : orthogonalCanvasPath(a, b, edge.fromSide, edge.toSide);
+    const path = svgNode('path', {d, fill: 'none', stroke: 'var(--text-muted)', 'stroke-width': 2}, svg);
+    if (edge.fromEnd === 'arrow') path.setAttribute('marker-start', `url(#${markerId})`);
+    if (edge.toEnd === 'arrow') path.setAttribute('marker-end', `url(#${markerId})`);
+    if (edge.label) {
+      const point = path.getPointAtLength(path.getTotalLength() / 2);
+      svgNode('text', {x: point.x, y: point.y, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        'font-size': 14, fill: 'var(--text-normal)', stroke: 'var(--background-primary)',
+        'stroke-width': 5, 'paint-order': 'stroke'}, svg).textContent = edge.label;
+    }
+  }
+  for (const {x, y, width, height, text} of data.nodes) {
+    svgNode('rect', {x, y, width, height, rx: 4, fill: 'var(--background-primary)', stroke: 'var(--background-modifier-border)'}, svg);
+    const frame = svgNode('foreignObject', {x, y, width, height}, svg);
+    const label = doc.createElement('div');
+    label.className = 'canvas-authoring-mermaid-preview-card';
+    label.textContent = text;
+    frame.appendChild(label);
   }
 }
