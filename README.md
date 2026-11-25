@@ -6,6 +6,8 @@
 
 **把 Obsidian Canvas 变成真正的白板。** Obsidian Canvas 很适合你和 AI Agent 一起工作。Canvas Authoring 在 Canvas 原有数据结构上做了最小改动，补齐无边框文本、字号调整和文字颜色等常用白板功能，让你们能在同一张白板上协作。
 
+![Canvas Authoring whiteboard example / 白板使用示例](./canvas-showcase.png)
+
 ## Core features / 核心功能
 
 | English | 中文 |
@@ -56,6 +58,7 @@ Example text node / 文字节点示例
 | **Copy and paste across apps.** Copy card content to other apps. Paste external text into a new card that sizes to the content, with supported rich text converted to Markdown. | **跨应用复制和粘贴。** 把卡片内容复制到其他应用，或将外部文字粘贴为自动调整初始尺寸的卡片。受支持的富文本格式会转换为 Markdown。 |
 | **Export and import Canvas data.** Copy selected nodes or a group as JSON, then paste it back as a new copy with its layout and internal links. | **导出与导入 Canvas 数据。** 将选区或分组复制为 JSON，再粘贴为新副本，保留布局和内部连线。 |
 | **Links to specific cards.** Paste a jump link into a note or another card to open the target Canvas and focus a specific node or group. | **跳转到指定卡片。** 把跳转链接贴到笔记或其他卡片，点击即可打开目标 Canvas 并定位到指定节点或分组。 |
+| **Import Mermaid diagrams.** Open **Import Mermaid diagram** from the canvas context menu or command palette. Paste a flowchart (TD, TB, BT, LR, or RL) or mind map, with or without a Mermaid code fence. Review the Canvas preview and fix any highlighted errors in the source before importing editable cards and connections. | **导入 Mermaid 图表。** 从画布空白处的右键菜单或命令面板打开 **Import Mermaid diagram**。粘贴流程图（TD、TB、BT、LR 或 RL）或思维导图，可带或不带 Mermaid 代码块。查看 Canvas 预览并在源码中修正高亮提示的错误，再导入可编辑的卡片和连线。 |
 
 ### Mind map shortcuts / 思维导图快捷键
 
@@ -68,16 +71,6 @@ Example text node / 文字节点示例
 Use these keys while a card is selected and you are outside text editing.
 
 选中卡片并退出文字编辑后，即可使用这些快捷键。
-
-### Import Mermaid diagrams / 导入 Mermaid 图表
-
-Open **Import Mermaid diagram** from the canvas context menu or command palette. Paste a flowchart or mind map with or without its Markdown code fence. The dialog identifies the diagram, shows a preview, and reports errors before enabling import.
-
-从画布空白处的右键菜单或命令面板打开 **Import Mermaid diagram**。粘贴流程图或思维导图源码，可带或不带 Markdown 代码块。面板会识别类型、显示预览，并在允许导入前提示错误。
-
-Flowcharts support `TD`, `TB`, `BT`, `LR`, and `RL`, including basic node labels, chains, and edge labels. Mind maps turn indented branches into cards with arrowless links. The importer supports basic mind map labels and shapes. Other diagram types can be kept as Mermaid blocks in text cards.
-
-流程图支持 `TD`、`TB`、`BT`、`LR` 和 `RL`，包括基本节点标签、链式连线和连线标签。思维导图按缩进生成卡片和无箭头连线，支持基本节点文字与形状写法。其他图表可保留在文字卡片的 Mermaid 代码块里。
 
 ## Installation / 安装
 

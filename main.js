@@ -542,6 +542,17 @@ module.exports = class CanvasAuthoring extends Plugin {
     });
     const message = modal.contentEl.createDiv({attr: {role: 'status', 'aria-live': 'polite'}});
     message.textContent = 'Paste Mermaid source to see a preview.';
+    const alert = modal.contentEl.createDiv({
+      cls: 'canvas-authoring-mermaid-error', attr: {role: 'alert', hidden: ''}
+    });
+    const errorTitle = alert.createEl('strong');
+    const errorDetail = alert.createDiv();
+    const showError = (title, detail) => {
+      message.hidden = true;
+      alert.hidden = false;
+      errorTitle.textContent = title;
+      errorDetail.textContent = detail;
+    };
     let revision = 0;
     let timer;
     let component;
@@ -561,7 +572,7 @@ module.exports = class CanvasAuthoring extends Plugin {
           modal.close();
           new Notice('Mermaid diagram imported.');
         } catch (error) {
-          message.textContent = error.message;
+          showError('Import failed', error.message);
         }
       });
     });
@@ -574,6 +585,10 @@ module.exports = class CanvasAuthoring extends Plugin {
       if (component) this.removeChild(component);
       component = undefined;
       preview.empty();
+      alert.hidden = true;
+      errorDetail.textContent = '';
+      message.hidden = false;
+      input.removeAttribute('aria-invalid');
       const source = input.value.trim();
       message.textContent = source ? 'Checking Mermaid source…' : 'Paste Mermaid source to see a preview.';
       if (!source) return;
@@ -612,7 +627,8 @@ module.exports = class CanvasAuthoring extends Plugin {
           importButton.setDisabled(false);
         } catch (error) {
           if (current !== revision) return;
-          message.textContent = kind ? `${kind} · ${error.message}` : error.message;
+          input.setAttribute('aria-invalid', 'true');
+          showError(kind ? `${kind}: preview unavailable` : 'Mermaid input could not be read', error.message);
         }
       }, 300);
     });
@@ -1078,16 +1094,64 @@ module.exports = class CanvasAuthoring extends Plugin {
         this.syncStyleButton(node.canvas, node.canvas.view);
       }));
   }
-  fontColorMenu(canvas, node, event) {
-    const menu = new Menu();
-    this.populateFontColors(menu, canvas, node);
-    menu.showAtMouseEvent(event);
-  }
-  populateFontColors(menu, canvas, node) {
+  toggleFontPalette(canvas, node, button) {
+    const wasOpen = this.fontPalette?.button === button;
+    this.fontPalette?.close();
+    if (wasOpen) return;
+
+    const doc = button.ownerDocument;
+    const palette = doc.createElement('div');
+    palette.className = 'canvas-submenu canvas-authoring-font-palette';
+    palette.setAttribute('role', 'group');
+    palette.setAttribute('aria-label', 'Text colors');
+
+    const listeners = new AbortController();
+    const {signal} = listeners;
+    const close = () => {
+      listeners.abort();
+      palette.remove();
+      button.classList.remove('is-active');
+      button.setAttribute('aria-expanded', 'false');
+      this.fontPalette = undefined;
+    };
+    this.fontPalette = {canvas, node, button, close};
+    button.classList.add('is-active');
+    button.setAttribute('aria-expanded', 'true');
+
     const colors = [['Default', undefined], ['Red', '1'], ['Orange', '2'], ['Yellow', '3'], ['Green', '4'], ['Cyan', '5'], ['Purple', '6']];
-    for (const [name, color] of colors) menu.addItem(item => item.setTitle(`Text color: ${name}`).setSection('text-color')
-      .setChecked(node.getData().fontColor === color)
-      .onClick(() => this.setFontColor(canvas, node, color)));
+    let selected;
+    for (const [name, color] of colors) {
+      const swatch = doc.createElement('button');
+      const active = node.getData().fontColor === color;
+      swatch.type = 'button';
+      swatch.className = 'canvas-authoring-font-swatch';
+      swatch.setAttribute('aria-label', name);
+      swatch.setAttribute('aria-pressed', String(active));
+      swatch.style.setProperty('--swatch-ink', color ? `var(--canvas-color-${color})` : 'var(--text-normal)');
+      if (typeof setTooltip === 'function') setTooltip(swatch, name, {placement: 'top'});
+      if (active) selected = swatch;
+      swatch.addEventListener('click', event => {
+        event.stopPropagation();
+        if (!canvas.readonly && this.selected(canvas) === node) this.setFontColor(canvas, node, color);
+        close();
+        button.focus({preventScroll: true});
+      });
+      palette.appendChild(swatch);
+    }
+
+    palette.addEventListener('pointerdown', event => event.stopPropagation());
+    button.parentElement.appendChild(palette);
+    doc.addEventListener('pointerdown', event => {
+      if (!palette.contains(event.target) && !button.contains(event.target)) close();
+    }, {capture: true, signal});
+    doc.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+      button.focus({preventScroll: true});
+    }, {capture: true, signal});
+    (selected || palette.firstElementChild).focus({preventScroll: true});
   }
   observeMenus(canvas, view) {
     if (this.menuObservers.has(canvas)) return;
@@ -1170,6 +1234,10 @@ module.exports = class CanvasAuthoring extends Plugin {
     const toolbar = view.containerEl.querySelector('.canvas-menu');
     if (!toolbar) return;
     const node = this.selected(canvas);
+    if (this.fontPalette?.canvas === canvas &&
+        (this.fontPalette.node !== node || !this.fontPalette.button.isConnected || canvas.readonly)) {
+      this.fontPalette.close();
+    }
     let button = toolbar.querySelector('.canvas-authoring-style');
     if (!node || node.getData().type !== 'text') { button?.remove(); toolbar.querySelector('.canvas-authoring-font-scale')?.remove(); return; }
     if (!button) {
@@ -1178,12 +1246,13 @@ module.exports = class CanvasAuthoring extends Plugin {
       button.type = 'button';
       button.title = 'Text color';
       button.setAttribute('aria-label', 'Text color');
+      button.setAttribute('aria-expanded', 'false');
       setIcon(button, 'type');
       button.addEventListener('pointerdown', e => e.stopPropagation());
       button.addEventListener('click', event => {
         event.stopPropagation();
         const current = this.selected(canvas);
-        if (current) this.fontColorMenu(canvas, current, event);
+        if (current?.getData().type === 'text' && !canvas.readonly) this.toggleFontPalette(canvas, current, button);
       });
       toolbar.appendChild(button);
     }
@@ -1324,6 +1393,7 @@ module.exports = class CanvasAuthoring extends Plugin {
     document.body.classList.toggle('canvas-authoring-claude-theme', this.settings.claudeCanvasTheme);
   }
   onunload() {
+    this.fontPalette?.close();
     document.body.classList.remove('canvas-authoring-claude-theme');
     for (const [node, {original, wrapped}] of this.fontBreakpoints) {
       if (node.updateBreakpoint === wrapped) node.updateBreakpoint = original;

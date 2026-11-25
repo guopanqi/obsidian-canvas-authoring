@@ -176,6 +176,53 @@
   color: var(--text-normal);
 }
 
+.canvas-authoring-mermaid-error {
+  padding: 10px 12px;
+  border: 1px solid var(--text-error);
+  border-inline-start-width: 3px;
+  border-radius: var(--radius-m);
+  background: var(--background-modifier-error);
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.canvas-authoring-mermaid-error strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.canvas-authoring-mermaid-columns > textarea[aria-invalid='true'] {
+  border-color: var(--text-error);
+}
+
+.canvas-authoring-font-palette {
+  gap: 5px;
+  padding: 8px 10px;
+}
+
+button.canvas-authoring-font-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--swatch-ink) 45%, transparent);
+  background: color-mix(in srgb, var(--swatch-ink) 22%, var(--background-primary));
+  box-shadow: none;
+  cursor: pointer;
+}
+
+button.canvas-authoring-font-swatch:hover,
+button.canvas-authoring-font-swatch[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--swatch-ink) 28%, var(--background-primary));
+  box-shadow: 0 0 0 2px var(--swatch-ink);
+}
+
+button.canvas-authoring-font-swatch:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 3px;
+}
+
 /* Optional bundled Claude Canvas theme, enabled by plugin setting. */
 body.canvas-authoring-claude-theme .workspace-leaf-content[data-type='canvas'] {
   color-scheme: light;
