@@ -1,10 +1,12 @@
 # Canvas Authoring
 
-![Canvas Authoring icon](./icon.svg)
+**Turn Obsidian Canvas into a real whiteboard with minimal changes**
 
-**Turn Obsidian Canvas into a real whiteboard.** Canvas is a place for you and your AI agent to work together. Canvas Authoring adds everyday whiteboard tools such as borderless text, adjustable font sizes, and text colors, with minimal changes to the existing Canvas data format.
+Canvas Authoring adds borderless text, adjustable font sizes, text colors, and tools for building mind maps and flowcharts. It makes minimal changes to the existing Canvas data format so you and your AI agent can work on the same board.
 
-**把 Obsidian Canvas 变成真正的白板。** Obsidian Canvas 很适合你和 AI Agent 一起工作。Canvas Authoring 在 Canvas 原有数据结构上做了最小改动，补齐无边框文本、字号调整和文字颜色等常用白板功能，让你们能在同一张白板上协作。
+**以最小改动，把 Obsidian Canvas 变成真正的白板**
+
+Canvas Authoring 加入无边框文字、字号和文字颜色调整，以及绘制思维导图和流程图的工具。插件只对现有 Canvas 数据格式做少量扩展，方便你和 AI Agent 在同一张白板上协作。
 
 ![Canvas Authoring whiteboard example / 白板使用示例](./canvas-showcase.png)
 
