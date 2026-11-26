@@ -2,11 +2,11 @@
 
 **Turn Obsidian Canvas into a real whiteboard with minimal changes**
 
-Canvas Authoring adds borderless text, adjustable font sizes, text colors, and tools for building mind maps and flowcharts. It makes minimal changes to the existing Canvas data format so you and your AI agent can work on the same board.
+Canvas Authoring adds borderless text, adjustable font scale, text colors, and tools for building mind maps and flowcharts. It makes minimal changes to the existing Canvas data format so you and your AI agent can work on the same board.
 
 **以最小改动，把 Obsidian Canvas 变成真正的白板**
 
-Canvas Authoring 加入无边框文字、字号和文字颜色调整，以及绘制思维导图和流程图的工具。插件只对现有 Canvas 数据格式做少量扩展，方便你和 AI Agent 在同一张白板上协作。
+Canvas Authoring 加入无边框文字、文字缩放和文字颜色调整，以及绘制思维导图和流程图的工具。插件只对现有 Canvas 数据格式做少量扩展，方便你和 AI Agent 在同一张白板上协作。
 
 ![Canvas Authoring whiteboard example / 白板使用示例](./canvas-showcase.png)
 
@@ -16,7 +16,7 @@ Canvas Authoring 加入无边框文字、字号和文字颜色调整，以及绘
 | --- | --- |
 | **Claude Canvas theme.** Enabled by default. You can turn it off in the plugin settings. | **Claude Canvas 主题。** 默认开启，可在插件设置中关闭。 |
 | **Right-angle mind map connectors.** Branch from a card to add child or sibling cards. Arrowless links use right angles. | **思维导图折线。** 从卡片展开子节点或同级节点，无箭头关联线显示为直角折线。 |
-| **Text color and font scale.** Change text color independently of the card color and choose 1×, 3×, or 5× text size. | **文字颜色与字号缩放。** 文字颜色可独立于卡片底色设置，字号缩放可选 1×、3× 或 5×。 |
+| **Text color and font scale.** Change text color independently of the card color and choose a font scale of 1×, 3×, or 5×. | **文字颜色与文字缩放。** 文字颜色可独立于卡片底色设置，文字缩放可选 1×、3× 或 5×。 |
 | **Transparent cards and annotations.** Hide a card’s background and border, or add an annotation anywhere on the board. | **卡片颜色透明与备注。** 隐藏卡片的底色和边框，也可以在白板任意位置添加备注。 |
 
 ## Canvas data for AI agents / 给 AI Agent 的白板数据说明
@@ -29,7 +29,7 @@ Keep the standard `nodes` and `edges` arrays. Add these optional values directly
 | --- | --- | --- |
 | `"color": "transparent"` | Hides the card background and border. This is an extra value for the existing `color` field. | 隐藏卡片底色和边框。这是已有 `color` 字段的扩展值。 |
 | `"fontColor": "3"` | Sets the text color. Use a palette slot string from `"1"` to `"6"`. Omit the field for the default text color. | 设置文字颜色。使用 `"1"` 到 `"6"` 的调色板编号字符串。省略此字段时使用默认文字颜色。 |
-| `"fontScale": 3` | Sets the text size multiplier on a text node. The menu offers `1`, `3`, and `5`. Omit the field for the default size of 1×. | 设置文字节点的字号倍率。菜单提供 `1`、`3`、`5` 三档。省略此字段时使用默认的 1×。 |
+| `"fontScale": 3` | Sets the font scale multiplier on a text node. The menu offers `1`, `3`, and `5`. Omit the field for the default scale of 1×. | 设置文字节点的文字缩放倍率。菜单提供 `1`、`3`、`5` 三档。省略此字段时使用默认的 1×。 |
 
 For a right-angle mind map connector, set both `"fromEnd": "none"` and `"toEnd": "none"` on the edge. Canvas Authoring uses these standard arrow settings to render the connector as a right angle.
 

@@ -1089,7 +1089,7 @@ module.exports = class CanvasAuthoring extends Plugin {
     menu.showAtMouseEvent(event);
   }
   populateFontScales(menu, node) {
-    for (const scale of [1, 3, 5]) menu.addItem(choice => choice.setTitle(`Font size: ${scale}×`).setSection('font-size')
+    for (const scale of [1, 3, 5]) menu.addItem(choice => choice.setTitle(`Font scale: ${scale}×`).setSection('font-size')
       .setChecked((node.getData().fontScale ?? 1) === scale).onClick(() => {
         const data = {...node.getData()};
         if (scale === 1) delete data.fontScale;
